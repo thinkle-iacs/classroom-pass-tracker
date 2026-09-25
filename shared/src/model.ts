@@ -14,11 +14,23 @@
 // Every write goes through a callable Function. Clients only read.
 import { z } from 'zod';
 
+/** Kiosk screensaver drawings (everyone-present state). */
+export const SCREENSAVERS = {
+  sierpinski: 'Sierpiński triangle',
+  stitching: 'Curve stitching (lines between axes)',
+  koch: 'Koch snowflake',
+  tree: 'Fractal tree',
+} as const;
+export type Screensaver = keyof typeof SCREENSAVERS;
+const screensaverIds = Object.keys(SCREENSAVERS) as [Screensaver, ...Screensaver[]];
+
 export const settingsSchema = z.object({
   warningAfterMinutes: z.number().min(1).max(60),
   attendanceThresholdMinutes: z.number().min(2).max(120),
   noPassFirstMinutes: z.number().min(0).max(40),
   noPassLastMinutes: z.number().min(0).max(40),
+  // Optional on input so settings saved before this existed still parse.
+  screensaver: z.enum(screensaverIds).default('sierpinski'),
 }).refine((s) => s.attendanceThresholdMinutes > s.warningAfterMinutes, { message: 'The attendance threshold must be later than the warning.' });
 export type Settings = z.infer<typeof settingsSchema>;
 
@@ -27,7 +39,13 @@ export const DEFAULT_SETTINGS: Settings = {
   attendanceThresholdMinutes: 15,
   noPassFirstMinutes: 10,
   noPassLastMinutes: 10,
+  screensaver: 'sierpinski',
 };
+
+/** Stored settings may predate newer fields; fill them from the defaults. */
+export function withDefaults(settings: Partial<Settings> | null | undefined): Settings {
+  return { ...DEFAULT_SETTINGS, ...settings };
+}
 
 export interface TeacherDoc<T = number> {
   email: string;

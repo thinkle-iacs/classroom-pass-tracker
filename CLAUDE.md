@@ -4,24 +4,33 @@ Read in this order: [docs/SPEC.md](docs/SPEC.md) (product intent) →
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (design decisions, flows, data model) →
 [docs/contain-css-svelte-AGENTS.md](docs/contain-css-svelte-AGENTS.md) (UI library guide).
 
-## Where things stand (2026-09-25)
+## Where things stand (2026-09-25, second session)
 
-The first session ran locally, with access to Tom's prior-art projects and the Firebase CLI.
-It did:
+The first session ran locally (Firebase project `iacs-pass-tracker`, Firestore nam5, rules and indexes deployed,
+web app registered; Tom's pending console steps are in [docs/firebase-setup.md](docs/firebase-setup.md)).
+The second session, in the cloud, built the whole build order below:
 
-- **Firebase project `iacs-pass-tracker` exists.** Firestore (nam5) is created, and rules and indexes are deployed.
-  The web app is registered, and its public config is in `web/src/lib/firebase-config.ts`. Console steps still
-  pending for Tom are listed in [docs/firebase-setup.md](docs/firebase-setup.md).
-- **`shared/` is done and tested:** bell schedules and the Aspen period parser (ported), school-timezone
-  clock, current-block resolution, display names + collisions, escalation, availability windows,
-  summaries, TSV export, Firestore doc types (`model.ts`), and callable contracts (`api.ts`).
-- **`functions/src/`** has `auth.ts` (teacher + kiosk guards), `sis.ts` (OneRoster reader ported from
-  google-classroom-sync-web, plus `FixtureSource`), and `identity.ts` (the privacy boundary).
-  `index.ts` is a stub.
-- **`firestore.rules`** is written and covered by `rules-tests/rules.test.ts`, which passes.
-- **`web/`** has only `package.json` and the Firebase config.
+- **`shared/`**: bell schedules, Aspen period parser, `schoolClock()`, current block, display names, escalation,
+  availability, summaries, TSV export, `classRhythm`, Firestore types (`model.ts`), callable contracts (`api.ts`).
+- **`functions/src/`**: `room.ts` (ensureTeacher, computeCurrent, buildDisplay, refreshRoom, transaction helpers),
+  `passes.ts`, `pairing.ts` (codes, pairKiosk, revoke, heartbeat), `sync.ts`, `controls.ts` (pause, override,
+  settings, names). `index.ts` wires every endpoint in `api.ts`. Modules take a `Ctx` (`{db, now}`).
+- **Tests**: `rules-tests/` (rules) and `functions/test/` (flows with a pinned clock, plus the vertical slice
+  through the real callables) run under `npm run test:emulated`.
+- **`web/`**: `/kiosk` (pairing, "Class Signout" roster under a screensaver overlay that fades on mouse/tap and
+  slowly traces a teacher-chosen pattern: Sierpiński, curve stitching, Koch, tree; out state with escalation,
+  paused/offline, wake lock)
+  and `/` (sign-in plus emulator dev sign-in, auto/refresh sync, live status/override/pause, connect display,
+  needs review, pass log with Copy for Spreadsheet and fixes, rhythm timeline, summaries, names, settings).
+  The MVP slice was driven end to end in Chromium against `npm run dev:emulated`.
 
-## Build next, in this order
+## Next
+
+- Tom: the console steps in docs/firebase-setup.md, then a first deploy and a real-classroom try.
+- Confirm the open questions in ARCHITECTURE.md (HS Wednesday, letters, calendar).
+- Not built yet: App Check / pairing throttling, nightly sync, CSV download.
+
+## Build order (done; kept for reference)
 
 1. **Functions** (`functions/src/`): implement the modules below. Each takes `db` and a clock so tests can call them directly.
    - `room.ts`: `ensureTeacher`, `computeCurrent`, `buildDisplay`, `refreshRoom`

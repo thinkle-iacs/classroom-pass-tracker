@@ -1,11 +1,12 @@
 <script lang="ts">
-  // Placeholder shell. `/kiosk` becomes the classroom display, `/` the teacher dashboard.
-  // See docs/ARCHITECTURE.md -> Teacher dashboard / Kiosk.
-  import { Container } from 'contain-css-svelte';
+  // Two routes, no router: `/kiosk` is the classroom display, everything else the teacher dashboard.
+  import KioskPage from './kiosk/KioskPage.svelte';
+  import DashboardPage from './teacher/DashboardPage.svelte';
   const isKiosk = location.pathname.startsWith('/kiosk');
 </script>
 
-<Container>
-  <h1>{isKiosk ? 'Classroom display' : 'Pass Tracker'}</h1>
-  <p>Not built yet.</p>
-</Container>
+{#if isKiosk}
+  <KioskPage />
+{:else}
+  <DashboardPage />
+{/if}
