@@ -109,6 +109,30 @@ export function tree(levels = 10): Generations {
 
 export const DRAWINGS: Record<Screensaver, () => Generations> = { sierpinski, koch, stitching, tree };
 
+/**
+ * How each pattern sits and moves on screen. `aspect` stretches the unit square
+ * wider (kiosk screens are wide; the triangle reads better a little broad);
+ * `line` scales stroke widths. Motion turns the drawing about `pivot` (unit
+ * coordinates): `spinMs` is one full turn, for shapes round enough to turn
+ * without clipping or shrinking; `rockDeg` is a gentle back-and-forth instead.
+ */
+export interface DrawingStyle { aspect: number; line: number; pivot: Point; spinMs?: number; rockDeg?: number }
+export const DRAWING_STYLE: Record<Screensaver, DrawingStyle> = {
+  sierpinski: { aspect: 1.3, line: 1.8, pivot: [0.5, 0.653], rockDeg: 6 }, // pivot = centroid
+  koch: { aspect: 1, line: 1, pivot: [0.5, 0.5], spinMs: 6 * 60_000 },
+  stitching: { aspect: 1, line: 1, pivot: [0.5, 0.5], spinMs: 5 * 60_000 },
+  tree: { aspect: 1, line: 1, pivot: [0.5, 0.98], rockDeg: 3 }, // sways from the base
+};
+
+const ROCK_MS = 90_000;
+/** Screen-space motion at together-time `t`: an angle (radians) and a small drift (fractions of the canvas). */
+export function motionAt(style: DrawingStyle, t: number): { angle: number; dx: number; dy: number } {
+  const wave = (period: number) => Math.sin((2 * Math.PI * t) / period);
+  const angle = style.spinMs ? (2 * Math.PI * t) / style.spinMs : ((style.rockDeg ?? 0) * Math.PI / 180) * wave(ROCK_MS);
+  // Two slow, unrelated periods, so the drift never visibly repeats.
+  return { angle: angle % (2 * Math.PI), dx: 0.015 * wave(97_000), dy: 0.012 * wave(131_000) };
+}
+
 // ------------------------------------------------------------------ schedule
 
 /** How long the full elaboration takes. A block is ~80 minutes; this is most of one. */

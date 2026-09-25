@@ -6,6 +6,12 @@
   --primary-color: #1d4e89;
   --heading-fg: var(--fg);
 
+  /* Section bars: a quiet header strip, no rules above and below. */
+  --bar-bg: #fafafa;
+  --bar-fg: #111;
+  --bar-border-top: none;
+  --bar-border-bottom: none;
+
   /* Text entry: its own surface and a visible edge, so fields read as fields. */
   --input-bg: #ffffff;
   --input-fg: var(--fg);
@@ -27,3 +33,9 @@
 }
 
 body { margin: 0; }
+
+/* Container typesets prose with `section h1..h6 { max-width: <measure>; margin-inline: auto }`
+   (contain-css-svelte 1.3). That descendant rule also reaches headings inside a Bar,
+   where auto margins in a flex row center the title. Headings in a Bar are titles,
+   not prose: pin them to the start. (.bar.bar outranks Container's `section h2`.) */
+.bar.bar > :is(h1, h2, h3, h4, h5, h6) { margin-inline: 0; max-width: none; }
