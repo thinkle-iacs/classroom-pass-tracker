@@ -3,14 +3,19 @@
   // sign-out list. Any mouse movement or tap fades it away to reveal the names;
   // after a while with no activity it fades back. The first tap only wakes it,
   // so nobody signs out by accident.
-  import { formatElapsed, type Screensaver } from '@pass/shared';
+  import { formatElapsed, schoolClock, type Screensaver } from '@pass/shared';
   import Drawing from './Drawing.svelte';
+  import { paletteFor } from './palettes';
 
   let { everyoneHereMs, pattern, hint }: { everyoneHereMs: number; pattern: Screensaver; hint: string } = $props();
 
   const IDLE_MS = 20_000;
   const MOVE_PX = 12; // ignore a bumped desk
   let awake = $state(false);
+  // A new palette each school day; re-checked as the together timer ticks, so an
+  // always-on kiosk rolls over at midnight too.
+  const dateKey = $derived.by(() => { void everyoneHereMs; return schoolClock(Date.now()).dateKey; });
+  const palette = $derived(paletteFor(dateKey));
 
   $effect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -39,7 +44,7 @@
 </script>
 
 <div class="overlay" class:awake aria-hidden={awake}>
-  <Drawing {pattern} elapsedMs={everyoneHereMs} running={!awake} />
+  <Drawing {pattern} elapsedMs={everyoneHereMs} running={!awake} colors={palette.colors} />
   <p class="together">Everyone's here · {formatElapsed(everyoneHereMs)} together</p>
   <p class="hint">{hint}</p>
 </div>

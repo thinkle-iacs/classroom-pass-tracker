@@ -1,5 +1,6 @@
 // Screensaver drawings as data. Each pattern is a list of generations; each
-// generation is a list of line segments in a unit square (y down). A schedule
+// generation is a list of line segments: in a unit square (y down) for flat
+// patterns, or around the origin (y up, radius 1) for solids. A schedule
 // maps "time everyone has been here" to how much has been traced, so the
 // drawing is a pure function of that time: it keeps going while hidden, and
 // picks up where it was after a reload.
@@ -8,9 +9,12 @@ import type { Screensaver } from '@pass/shared';
 export type Point = readonly [number, number];
 export type Segment = readonly [Point, Point];
 export type Generations = Segment[][];
+export type Point3 = readonly [number, number, number];
+export type Segment3 = readonly [Point3, Point3];
 
-const mid = (a: Point, b: Point): Point => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-const lerp = (a: Point, b: Point, t: number): Point => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+type Vec = readonly number[];
+const lerp = <P extends Vec>(a: P, b: P, t: number): P => a.map((v, i) => v + (b[i]! - v) * t) as unknown as P;
+const mid = <P extends Vec>(a: P, b: P): P => lerp(a, b, 0.5);
 const H = Math.sqrt(3) / 2;
 
 /** An upright equilateral triangle filling most of the square. */
@@ -21,7 +25,7 @@ function baseTriangle(size = 0.92): [Point, Point, Point] {
 const edges = (t: readonly Point[]): Segment[] => t.map((p, i) => [p, t[(i + 1) % t.length]!] as Segment);
 
 /** Outline, then the inverted middle triangle of every remaining triangle, level by level. */
-export function sierpinski(levels = 7): Generations {
+export function sierpinskiTriangle(levels = 7): Generations {
   let triangles = [baseTriangle()];
   const gens: Generations = [edges(triangles[0]!)];
   for (let g = 1; g < levels; g++) {
@@ -34,6 +38,38 @@ export function sierpinski(levels = 7): Generations {
     }
     gens.push(gen);
     triangles = next;
+  }
+  return gens;
+}
+
+/**
+ * Sierpiński tetrahedron (3D): the six edges of a regular tetrahedron, then in
+ * every remaining tetrahedron the twelve edges joining its edge midpoints (the
+ * octahedron that gets hollowed out), level by level.
+ */
+// Five levels: a sixth (3,072 edges) turns to fuzz at kiosk size.
+export function sierpinskiTetrahedron(levels = 5): Segment3[][] {
+  // Regular, centered on the origin, circumradius 1, one vertex straight up.
+  const r = Math.sqrt(8) / 3;
+  const base = [0, 1, 2].map((i) => [r * Math.cos((i * 2 * Math.PI) / 3), -1 / 3, r * Math.sin((i * 2 * Math.PI) / 3)] as Point3);
+  const pairs = [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]] as const;
+  let tetras: Point3[][] = [[[0, 1, 0], ...base]];
+  const gens: Segment3[][] = [pairs.map(([i, j]) => [tetras[0]![i]!, tetras[0]![j]!] as Segment3)];
+  for (let g = 1; g < levels; g++) {
+    const gen: Segment3[] = [];
+    const next: Point3[][] = [];
+    for (const t of tetras) {
+      const m = (i: number, j: number) => mid(t[i]!, t[j]!);
+      // Midpoint of edge (i,j) is shared by the corners i and j; octahedron edges join
+      // midpoints of edges that share exactly one vertex.
+      for (const [a, b] of pairs) for (const [c, d] of pairs) {
+        const shared = [a, b].filter((v) => v === c || v === d).length;
+        if (shared === 1 && `${a}${b}` < `${c}${d}`) gen.push([m(a, b), m(c, d)]);
+      }
+      for (let k = 0; k < 4; k++) next.push([0, 1, 2, 3].map((j) => (j === k ? t[k]! : mid(t[k]!, t[j]!))));
+    }
+    gens.push(gen);
+    tetras = next;
   }
   return gens;
 }
@@ -107,19 +143,24 @@ export function tree(levels = 10): Generations {
   return gens;
 }
 
-export const DRAWINGS: Record<Screensaver, () => Generations> = { sierpinski, koch, stitching, tree };
+export type Flat = Exclude<Screensaver, 'sierpinski'>;
+export const DRAWINGS: Record<Flat, () => Generations> = { triangle: sierpinskiTriangle, koch, stitching, tree };
+export const SOLIDS: Record<Exclude<Screensaver, Flat>, () => Segment3[][]> = { sierpinski: sierpinskiTetrahedron };
+export const isSolid = (p: Screensaver): p is Exclude<Screensaver, Flat> => p in SOLIDS;
 
 /**
  * How each pattern sits and moves on screen. `aspect` stretches the unit square
  * wider (kiosk screens are wide; the triangle reads better a little broad);
  * `line` scales stroke widths. Motion turns the drawing about `pivot` (unit
  * coordinates): `spinMs` is one full turn (corners may leave the screen);
- * `rockDeg` is a gentle back-and-forth instead.
+ * `rockDeg` is a gentle back-and-forth instead. Solids spin `spinMs` about their
+ * vertical axis, seen from `tiltDeg` above, nodding by `wobbleDeg`.
  */
-export interface DrawingStyle { aspect: number; line: number; pivot: Point; spinMs?: number; rockDeg?: number }
+export interface DrawingStyle { aspect: number; line: number; pivot: Point; spinMs?: number; rockDeg?: number; tiltDeg?: number; wobbleDeg?: number }
 export const DRAWING_STYLE: Record<Screensaver, DrawingStyle> = {
-  // Spins about its centroid; the tips may sweep off screen, which is fine.
-  sierpinski: { aspect: 1.3, line: 1.8, pivot: [0.5, 0.653], spinMs: 7 * 60_000 },
+  sierpinski: { aspect: 1, line: 1.5, pivot: [0.5, 0.5], spinMs: 4 * 60_000, tiltDeg: 16, wobbleDeg: 10 },
+  // Equilateral, spinning about its centroid; the tips may sweep off screen, which is fine.
+  triangle: { aspect: 1, line: 1.8, pivot: [0.5, 0.653], spinMs: 7 * 60_000 },
   koch: { aspect: 1, line: 1, pivot: [0.5, 0.5], spinMs: 6 * 60_000 },
   stitching: { aspect: 1, line: 1, pivot: [0.5, 0.5], spinMs: 5 * 60_000 },
   tree: { aspect: 1, line: 1, pivot: [0.5, 0.98], rockDeg: 3 }, // sways from the base
@@ -132,6 +173,27 @@ export function motionAt(style: DrawingStyle, t: number): { angle: number; dx: n
   const angle = style.spinMs ? (2 * Math.PI * t) / style.spinMs : ((style.rockDeg ?? 0) * Math.PI / 180) * wave(ROCK_MS);
   // Two slow, unrelated periods, so the drift never visibly repeats.
   return { angle: angle % (2 * Math.PI), dx: 0.015 * wave(97_000), dy: 0.012 * wave(131_000) };
+}
+
+const WOBBLE_MS = 150_000;
+/** Camera for a solid at together-time `t`: yaw about the vertical axis, tilt toward the viewer. */
+export function cameraAt(style: DrawingStyle, t: number): { yaw: number; tilt: number } {
+  const deg = Math.PI / 180;
+  return {
+    yaw: ((2 * Math.PI * t) / (style.spinMs ?? 240_000)) % (2 * Math.PI),
+    tilt: ((style.tiltDeg ?? 15) + (style.wobbleDeg ?? 0) * Math.sin((2 * Math.PI * t) / WOBBLE_MS)) * deg,
+  };
+}
+
+const EYE = 5; // perspective: camera distance in circumradii
+/** Rotate then project a point of a solid: screen-ish x/y (y up) and depth (near > 0). */
+export function project([x, y, z]: Point3, { yaw, tilt }: { yaw: number; tilt: number }): { x: number; y: number; depth: number } {
+  const x1 = x * Math.cos(yaw) + z * Math.sin(yaw);
+  const z1 = -x * Math.sin(yaw) + z * Math.cos(yaw);
+  const y2 = y * Math.cos(tilt) - z1 * Math.sin(tilt);
+  const z2 = y * Math.sin(tilt) + z1 * Math.cos(tilt);
+  const k = EYE / (EYE - z2);
+  return { x: x1 * k, y: y2 * k, depth: z2 };
 }
 
 // ------------------------------------------------------------------ schedule
@@ -156,20 +218,20 @@ export function progressAt(generationCount: number, elapsedMs: number, totalMs =
   return { generation: generationCount - 1, fraction: 1, done: true };
 }
 
-const length = ([a, b]: Segment) => Math.hypot(b[0] - a[0], b[1] - a[1]);
+const length = ([a, b]: readonly [Vec, Vec]) => Math.hypot(...a.map((v, i) => b[i]! - v));
 
 /**
  * The segments of one generation traced up to `fraction` of its total length,
  * in order. The last one may be partial: that's the pen, still moving.
  */
-export function traced(gen: readonly Segment[], fraction: number): Segment[] {
+export function traced<S extends readonly [Vec, Vec]>(gen: readonly S[], fraction: number): S[] {
   const total = gen.reduce((sum, s) => sum + length(s), 0);
   let budget = total * Math.min(1, Math.max(0, fraction));
-  const out: Segment[] = [];
+  const out: S[] = [];
   for (const s of gen) {
     const l = length(s);
     if (budget >= l) { out.push(s); budget -= l; continue; }
-    if (budget > 0) out.push([s[0], lerp(s[0], s[1], budget / l)]);
+    if (budget > 0) out.push([s[0], lerp(s[0], s[1], budget / l)] as unknown as S);
     break;
   }
   return out;

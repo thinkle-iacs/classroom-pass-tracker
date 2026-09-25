@@ -16,7 +16,8 @@ import { z } from 'zod';
 
 /** Kiosk screensaver drawings (everyone-present state). */
 export const SCREENSAVERS = {
-  sierpinski: 'Sierpiński triangle',
+  sierpinski: 'Sierpiński tetrahedron (3D)',
+  triangle: 'Sierpiński triangle',
   stitching: 'Curve stitching (lines between axes)',
   koch: 'Koch snowflake',
   tree: 'Fractal tree',
