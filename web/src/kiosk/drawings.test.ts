@@ -39,7 +39,7 @@ describe('screensaver motion', () => {
     const stitch = DRAWING_STYLE.stitching;
     expect(motionAt(stitch, stitch.spinMs! / 4).angle).toBeCloseTo(Math.PI / 2);
     for (let t = 0; t < 600_000; t += 7_000) {
-      expect(Math.abs(motionAt(DRAWING_STYLE.sierpinski, t).angle)).toBeLessThanOrEqual((6 * Math.PI) / 180 + 1e-9);
+      expect(Math.abs(motionAt(DRAWING_STYLE.tree, t).angle)).toBeLessThanOrEqual((3 * Math.PI) / 180 + 1e-9);
       const { dx, dy } = motionAt(DRAWING_STYLE.koch, t);
       expect(Math.max(Math.abs(dx), Math.abs(dy))).toBeLessThanOrEqual(0.015);
     }

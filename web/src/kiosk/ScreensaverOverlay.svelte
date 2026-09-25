@@ -54,7 +54,8 @@
     transition: opacity 1.2s ease;
   }
   .awake { opacity: 0; pointer-events: none; }
-  p { position: absolute; left: 0; right: 0; margin: 0; text-align: center; }
+  /* Lines may pass behind the caption; a soft halo keeps it readable. */
+  p { position: absolute; left: 0; right: 0; margin: 0; text-align: center; text-shadow: 0 0 0.6em var(--kiosk-bg), 0 0 0.2em var(--kiosk-bg); }
   .together { bottom: 9vh; font-size: clamp(1.4rem, 2.6vw, 2.4rem); font-variant-numeric: tabular-nums; opacity: 0.85; }
   .hint { bottom: 4vh; font-size: clamp(1rem, 1.6vw, 1.4rem); opacity: 0.5; }
 </style>

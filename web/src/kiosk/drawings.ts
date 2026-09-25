@@ -113,12 +113,13 @@ export const DRAWINGS: Record<Screensaver, () => Generations> = { sierpinski, ko
  * How each pattern sits and moves on screen. `aspect` stretches the unit square
  * wider (kiosk screens are wide; the triangle reads better a little broad);
  * `line` scales stroke widths. Motion turns the drawing about `pivot` (unit
- * coordinates): `spinMs` is one full turn, for shapes round enough to turn
- * without clipping or shrinking; `rockDeg` is a gentle back-and-forth instead.
+ * coordinates): `spinMs` is one full turn (corners may leave the screen);
+ * `rockDeg` is a gentle back-and-forth instead.
  */
 export interface DrawingStyle { aspect: number; line: number; pivot: Point; spinMs?: number; rockDeg?: number }
 export const DRAWING_STYLE: Record<Screensaver, DrawingStyle> = {
-  sierpinski: { aspect: 1.3, line: 1.8, pivot: [0.5, 0.653], rockDeg: 6 }, // pivot = centroid
+  // Spins about its centroid; the tips may sweep off screen, which is fine.
+  sierpinski: { aspect: 1.3, line: 1.8, pivot: [0.5, 0.653], spinMs: 7 * 60_000 },
   koch: { aspect: 1, line: 1, pivot: [0.5, 0.5], spinMs: 6 * 60_000 },
   stitching: { aspect: 1, line: 1, pivot: [0.5, 0.5], spinMs: 5 * 60_000 },
   tree: { aspect: 1, line: 1, pivot: [0.5, 0.98], rockDeg: 3 }, // sways from the base

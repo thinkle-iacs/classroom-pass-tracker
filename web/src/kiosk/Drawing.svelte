@@ -38,9 +38,11 @@
       if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, w, h);
-      const sy = Math.min(w / style.aspect, h) * 0.92;
+      // Fit the drawing above the caption band; while turning it may spill anywhere.
+      const ah = h * 0.82;
+      const sy = Math.min(w / style.aspect, ah) * 0.92;
       const sx = sy * style.aspect;
-      const ox = (w - sx) / 2, oy = (h - sy) / 2;
+      const ox = (w - sx) / 2, oy = (ah - sy) / 2;
       const t = base.elapsed + (now - base.at);
       const { generation, fraction } = progressAt(gens.length, t);
       // Slow turn about the pattern's pivot, plus a slight drift.
@@ -73,5 +75,5 @@
 <canvas bind:this={canvas} aria-hidden="true"></canvas>
 
 <style>
-  canvas { position: absolute; inset: 2vh 0 16vh; width: 100%; height: calc(100% - 18vh); } /* leave room for the caption */
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 </style>
