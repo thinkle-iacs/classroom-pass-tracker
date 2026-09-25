@@ -4,7 +4,7 @@
   import { GoogleAuthProvider, onAuthStateChanged, signInWithCredential, signInWithPopup, signOut, type User } from 'firebase/auth';
   import { collection, doc, limit, orderBy, query, where } from 'firebase/firestore';
   import { Bar, Button, Inline, Text } from 'contain-css-svelte';
-  import { DEFAULT_SETTINGS, effectiveName, type DisplayDoc, type EndpointName, type Endpoints, type KioskDoc, type PassDoc, type RosterStudentDoc, type RoomDoc, type Settings, type TeacherDoc } from '@pass/shared';
+  import { effectiveName, withDefaults, type DisplayDoc, type EndpointName, type Endpoints, type KioskDoc, type PassDoc, type RosterStudentDoc, type RoomDoc, type Settings, type TeacherDoc } from '@pass/shared';
   import { connect, errorMessage, useEmulators } from '../lib/firebase';
   import { liveDoc, liveQuery, ticker } from '../lib/live.svelte';
   import { toPassRow, type Millis } from '../lib/records';
@@ -42,7 +42,7 @@
   const passes = $derived(passDocs.value.map(toPassRow));
   const active = $derived(passes.find((p) => p.id === room.value?.activePass?.passId) ?? null);
   const review = $derived(passes.filter((p) => p.needsReview && p.status === 'active'));
-  const settings: Settings = $derived(teacher.value?.settings ?? DEFAULT_SETTINGS);
+  const settings: Settings = $derived(withDefaults(teacher.value?.settings));
   const roster = $derived(studentDocs.value.filter((s) => s.sectionKeys.length).sort((a, b) => a.familyName.localeCompare(b.familyName) || a.givenName.localeCompare(b.givenName)));
   const choices = $derived(roster.map((s) => ({ id: s.id, name: effectiveName(s) })));
 

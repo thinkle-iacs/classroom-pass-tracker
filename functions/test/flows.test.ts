@@ -1,6 +1,6 @@
 // Functions modules against the Firestore emulator, with a pinned clock.
 import { describe, expect, it } from 'vitest';
-import type { Timestamp } from 'firebase-admin/firestore';
+import { FieldValue, type Timestamp } from 'firebase-admin/firestore';
 import { FIXTURE_CLASSES, FIXTURE_ROSTERS } from '@pass/shared/fixtures';
 import type { DisplayDoc, PassDoc, RoomDoc, TeacherDoc } from '@pass/shared';
 import { invalidatePass, kioskReturn, kioskStartPass, reassignPass, teacherEndPass } from '../src/passes';
@@ -98,6 +98,13 @@ describe('sync and display', () => {
     expect((await display()).roster).toEqual([]);
   });
 
+  it('fills settings saved before the screensaver option existed', async () => {
+    const { ctx, teacher, kiosk, display } = await pairedRoom();
+    await db.doc(`teachers/${teacher.uid}`).update({ 'settings.screensaver': FieldValue.delete() });
+    await refreshRoom(ctx, kiosk.roomId, { force: true });
+    expect((await display()).settings.screensaver).toBe('sierpinski');
+  });
+
   it('heartbeat writes nothing when nothing changed', async () => {
     const { ctx, kiosk, display } = await pairedRoom();
     const before = (await display()).updatedAt.toMillis();
@@ -169,8 +176,8 @@ describe('passes', () => {
     await setPaused(ctx, teacher.uid, { paused: false });
     ctx.set(MONDAY_10AM - 15 * MINUTE); // 09:45, first 10 minutes of Block 2
     await expect(kioskStartPass(ctx, kiosk, { k: b!.k, requestId: 'avail-0004' })).rejects.toMatchObject({ details: { reason: 'start-of-class' } });
-    await updateSettings(ctx, teacher.uid, { settings: { warningAfterMinutes: 4, attendanceThresholdMinutes: 12, noPassFirstMinutes: 0, noPassLastMinutes: 5 } });
-    expect((await display()).settings.warningAfterMinutes).toBe(4);
+    await updateSettings(ctx, teacher.uid, { settings: { warningAfterMinutes: 4, attendanceThresholdMinutes: 12, noPassFirstMinutes: 0, noPassLastMinutes: 5, screensaver: 'koch' } });
+    expect((await display()).settings).toMatchObject({ warningAfterMinutes: 4, screensaver: 'koch' });
     await expect(kioskStartPass(ctx, kiosk, { k: b!.k, requestId: 'avail-0005' })).resolves.toHaveProperty('passId');
   });
 

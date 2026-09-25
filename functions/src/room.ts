@@ -1,7 +1,7 @@
 import { FieldValue, Timestamp, type DocumentReference, type Firestore, type Transaction } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import {
-  DEFAULT_SETTINGS, effectiveName, resolveCurrentBlock, schoolClock,
+  DEFAULT_SETTINGS, effectiveName, resolveCurrentBlock, schoolClock, withDefaults,
   type CurrentSection, type DisplayDoc, type RoomDoc, type RosterStudentDoc, type SectionDoc, type TeacherDoc,
 } from '@pass/shared';
 import { kioskKey, newOpaqueId } from './identity';
@@ -103,7 +103,7 @@ export function buildDisplay(room: Room, teacher: Teacher, section: { title: str
     roster,
     active: active ? { k: kioskKey(room.displaySalt, active.appStudentId), name: nameOf(active.appStudentId) ?? 'A student', departedAt: active.departedAt } : null,
     togetherSince: room.togetherSince,
-    settings: teacher.settings,
+    settings: withDefaults(teacher.settings),
     updatedAt: now,
   };
 }

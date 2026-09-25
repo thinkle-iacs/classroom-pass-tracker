@@ -17,7 +17,9 @@ The second session, in the cloud, built the whole build order below:
   settings, names). `index.ts` wires every endpoint in `api.ts`. Modules take a `Ctx` (`{db, now}`).
 - **Tests**: `rules-tests/` (rules) and `functions/test/` (flows with a pinned clock, plus the vertical slice
   through the real callables) run under `npm run test:emulated`.
-- **`web/`**: `/kiosk` (pairing, roster, out state with escalation, paused/offline, wake lock, ambient tree)
+- **`web/`**: `/kiosk` (pairing, "Class Signout" roster under a screensaver overlay that fades on mouse/tap and
+  slowly traces a teacher-chosen pattern: Sierpiński, curve stitching, Koch, tree; out state with escalation,
+  paused/offline, wake lock)
   and `/` (sign-in plus emulator dev sign-in, auto/refresh sync, live status/override/pause, connect display,
   needs review, pass log with Copy for Spreadsheet and fixes, rhythm timeline, summaries, names, settings).
   The MVP slice was driven end to end in Chromium against `npm run dev:emulated`.
