@@ -201,9 +201,10 @@ Indexes are in `firestore.indexes.json`.
 
 ## Testing
 - `npm test`: unit tests for shared logic. Runs anywhere.
-- `npm run test:emulated`: rules tests (`rules-tests/`) plus, to do, Functions integration tests against the
-  emulators. Needs Java for the Firestore emulator. Put Functions logic in modules that take `db`
-  and a clock so tests can call them directly.
+- `npm run test:emulated`: rules tests (`rules-tests/`) plus Functions integration tests (`functions/test/`)
+  against the emulators. Needs Java for the Firestore emulator. Functions logic lives in modules that take a
+  `Ctx` (`{db, now}`), so `flows.test.ts` calls them directly with a pinned clock; `e2e.test.ts` runs the
+  vertical slice through the real callables with the web SDK (teacher dev sign-in, kiosk custom token).
 - Tests that must exist before calling the MVP done: simultaneous start from two kiosks → one pass;
   double-tap → same passId; revoked kiosk → callable and listener both denied; kiosk payloads contain no
   Aspen ids (assert on the `displays` doc); override survives re-sync; stale pass flagged.
