@@ -59,6 +59,19 @@ firestore 8181, UI 4011. They're non-default to avoid clashing with other local 
 `SIS_MODE=fixture` serves synthetic rosters. `scripts/ensure-emulator-secrets.mjs` writes dummy
 secrets to the git-ignored `functions/.secret.local`. The Firestore emulator needs Java 11+.
 
+## Live web deploys on push to main (GitHub Actions)
+
+`.github/workflows/deploy.yml` runs on every push to `main` (and by hand from the
+Actions tab): `npm run verify`, `npm run test:emulated`, then deploys `web/` to the
+live Hosting site. It uses the same `FIREBASE_SERVICE_ACCOUNT_IACS_PASS_TRACKER`
+secret as the previews below, so it works once that one-time setup is done.
+It deploys the web bundle only. Rules, indexes and Functions still go out by hand
+(`firebase deploy --only firestore` / `--only functions`), before pushing web code
+that depends on them.
+
+Pushing to `main` during class time updates every classroom display on its next
+reload, so the rule above about class time applies to `main` too.
+
 ## PR preview URLs (GitHub Actions)
 
 `.github/workflows/preview.yml` builds every PR and deploys `web/` to a Hosting

@@ -59,8 +59,11 @@ The second session, in the cloud, built the whole build order below:
 - All schedule and time math goes through `schoolClock()` (America/New_York). Stored times come from the Functions clock, never the kiosk's.
 - UI: follow the Contain idiom (ARCHITECTURE.md → Frontend idiom). Keep components small and `<style>` minimal.
   Use Svelte 5 runes only.
-- **Don't deploy from a cloud session.** Tom deploys locally (`docs/firebase-setup.md`). Nothing here
-  should need production credentials. Use emulators + `SIS_MODE=fixture`.
+- **Work on `main`** (pilot phase; Tom's call). Commit and push straight to `main`, no PR.
+  **A push to `main` deploys the web app live** (`.github/workflows/deploy.yml`, after verify +
+  emulated tests), so treat every push as a release, and avoid class hours for risky ones.
+- **Don't deploy from a cloud session** yourself. CI deploys web; Tom deploys rules and Functions locally
+  (`docs/firebase-setup.md`). Nothing here should need production credentials. Use emulators + `SIS_MODE=fixture`.
 - `npm run verify` must pass before you push. Also run `npm run test:emulated` when Java is available.
 
 ## Commands

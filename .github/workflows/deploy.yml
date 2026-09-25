@@ -1,0 +1,44 @@
+# Every push to main that passes the checks deploys web/ to the live Firebase
+# Hosting site (iacs-pass-tracker.web.app). Web bundle only: Firestore rules and
+# Functions still deploy manually (docs/firebase-setup.md), so a change that needs
+# new server code needs `firebase deploy --only functions` too.
+#
+# Uses the same repo secret as preview.yml (FIREBASE_SERVICE_ACCOUNT_IACS_PASS_TRACKER).
+name: Deploy web
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  checks: write
+  contents: read
+
+# Deploys land in order; a newer push waits rather than racing an older one.
+concurrency:
+  group: deploy-live
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci
+      # Pushes go straight to main without review, so run the full gate here.
+      - run: npm run verify
+      - run: npm run test:emulated
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IACS_PASS_TRACKER }}
+          projectId: iacs-pass-tracker
+          channelId: live
