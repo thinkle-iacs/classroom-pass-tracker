@@ -1,0 +1,60 @@
+rules_version = '2';
+// Clients only READ. Every write goes through a callable Function (Admin SDK).
+// A kiosk is an untrusted public client: it may read exactly one document,
+// displays/{roomId}, for the room in its custom-token claims, while its
+// kiosks/{kioskId} record exists and is not revoked. See docs/ARCHITECTURE.md.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function doc(path) { return get(/databases/$(database)/documents/$(path)); }
+
+    function isTeacher() {
+      return signedIn()
+        && request.auth.token.get('kiosk', false) != true
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower().matches('^[^@]+@innovationcharter[.]org$')
+        && request.auth.token.firebase.sign_in_provider == 'google.com';
+    }
+
+    function isKioskFor(roomId) {
+      let t = request.auth.token;
+      return signedIn()
+        && t.get('kiosk', false) == true
+        && t.roomId == roomId
+        && request.auth.uid == 'kiosk_' + t.kioskId
+        && doc(/kiosks/$(t.kioskId)).data.roomId == roomId
+        && doc(/kiosks/$(t.kioskId)).data.revokedAt == null;
+    }
+
+    function ownsRoom(roomId) {
+      return isTeacher() && doc(/rooms/$(roomId)).data.teacherUid == request.auth.uid;
+    }
+
+    match /teachers/{uid} {
+      allow read: if isTeacher() && request.auth.uid == uid;
+      match /{sub=**} {
+        allow read: if isTeacher() && request.auth.uid == uid;
+      }
+    }
+
+    match /rooms/{roomId} {
+      allow read: if isTeacher() && resource.data.teacherUid == request.auth.uid;
+    }
+
+    // The ONLY document a kiosk can read. `get` only: no listing other rooms.
+    match /displays/{roomId} {
+      allow get: if isKioskFor(roomId) || ownsRoom(roomId);
+    }
+
+    match /kiosks/{kioskId} {
+      allow read: if isTeacher() && resource.data.teacherUid == request.auth.uid;
+    }
+
+    match /passes/{passId} {
+      allow read: if isTeacher() && resource.data.teacherUid == request.auth.uid;
+    }
+
+    // studentIdentities/* and pairingCodes/* have no rules: Functions-only.
+    // No write rules anywhere: denied by default.
+  }
+}

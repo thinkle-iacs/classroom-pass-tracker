@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "default": "iacs-pass-tracker",
+    "prod": "iacs-pass-tracker",
+    "demo": "demo-pass-tracker"
+  }
+}

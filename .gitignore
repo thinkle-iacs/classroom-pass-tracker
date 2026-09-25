@@ -1,0 +1,18 @@
+node_modules/
+dist/
+/functions/lib/
+storybook-static/
+.firebase/
+*-debug.log*
+.env*
+!.env.example
+.secret.local
+.DS_Store
+coverage/
+test-results/
+output/
+.playwright-cli/
+# Public, non-secret Functions parameters are committed on purpose:
+!functions/.env.demo-pass-tracker
+!functions/.env.iacs-pass-tracker
+!functions/.secret.local.example

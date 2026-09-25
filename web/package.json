@@ -1,0 +1,22 @@
+{
+  "name": "@pass/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5173 --strictPort",
+    "build": "vite build",
+    "check": "svelte-check --tsconfig tsconfig.json"
+  },
+  "dependencies": {
+    "@pass/shared": "*",
+    "contain-css-svelte": "^1.3.0",
+    "firebase": "^12.0.0",
+    "svelte": "^5.46.4"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.0",
+    "svelte-check": "^4.0.0",
+    "vite": "^8.0.0"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    { "collectionGroup": "passes", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "teacherUid", "order": "ASCENDING" }, { "fieldPath": "departedAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "passes", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "teacherUid", "order": "ASCENDING" }, { "fieldPath": "appStudentId", "order": "ASCENDING" }, { "fieldPath": "departedAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "passes", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "teacherUid", "order": "ASCENDING" }, { "fieldPath": "needsReview", "order": "ASCENDING" }, { "fieldPath": "departedAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "kiosks", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "teacherUid", "order": "ASCENDING" }, { "fieldPath": "pairedAt", "order": "DESCENDING" } ] }
+  ],
+  "fieldOverrides": []
+}
