@@ -1,0 +1,37 @@
+# Every PR gets its own Firebase Hosting preview channel (pr-<number>), and the
+# bot comments the URL on the PR. Previews use production Functions and data;
+# only the web bundle differs. Production deploys stay manual (docs/firebase-setup.md).
+#
+# Needs repo secret FIREBASE_SERVICE_ACCOUNT_IACS_PASS_TRACKER (created by
+# `firebase init hosting:github`; see docs/firebase-setup.md).
+name: PR preview
+on: pull_request
+
+permissions:
+  checks: write
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    # Secrets aren't available to fork PRs; skip instead of failing.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run verify
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_IACS_PASS_TRACKER }}
+          projectId: iacs-pass-tracker
+          expires: 7d

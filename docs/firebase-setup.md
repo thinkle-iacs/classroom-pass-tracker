@@ -58,3 +58,20 @@ deploy lands under a live classroom display.
 firestore 8181, UI 4011. They're non-default to avoid clashing with other local projects.
 `SIS_MODE=fixture` serves synthetic rosters. `scripts/ensure-emulator-secrets.mjs` writes dummy
 secrets to the git-ignored `functions/.secret.local`. The Firestore emulator needs Java 11+.
+
+## PR preview URLs (GitHub Actions)
+
+`.github/workflows/preview.yml` builds every PR and deploys `web/` to a Hosting
+preview channel (`pr-<number>`, 7-day expiry), then comments the URL on the PR.
+Previews share production Functions and Firestore, so a PR that changes Functions
+needs a manual `firebase deploy --only functions` before its server-side changes work.
+
+One-time setup (Tom): create the deploy service account and GitHub secret with
+
+```sh
+firebase init hosting:github
+```
+
+Answer with repo `thinkle-iacs/classroom-pass-tracker`. **Decline** the build-script
+and workflow-file prompts (or answer "no" to overwriting); `preview.yml` already exists.
+This creates the secret `FIREBASE_SERVICE_ACCOUNT_IACS_PASS_TRACKER`.
