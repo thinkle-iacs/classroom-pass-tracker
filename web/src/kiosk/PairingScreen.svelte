@@ -26,7 +26,7 @@
     <FormItem layout="above" fullWidth>
       {#snippet label()}Pairing code{/snippet}
       <Input bind:value={code} maxlength={8} autocomplete="off" autocapitalize="characters" spellcheck={false}
-        fontSize="2.5rem" letterSpacing="0.3em" textAlign="center" aria-label="Pairing code" />
+        fontSize="2.5rem" letterSpacing="0.3em" textAlign="center" textTransform="uppercase" aria-label="Pairing code" />
     </FormItem>
     <FormItem layout="above" fullWidth>
       {#snippet label()}Name for this display (optional){/snippet}
