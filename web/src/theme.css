@@ -1,0 +1,22 @@
+/* App theme: Contain variables only. Components read these; nothing else should
+   need colors of its own. The kiosk escalation palette is the one bespoke set. */
+:root {
+  --font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --primary-bg: #1d4e89;
+  --primary-color: #1d4e89;
+  --heading-fg: var(--fg);
+
+  /* Classroom display: readable across a room. */
+  --kiosk-bg: #0f1c2e;
+  --kiosk-fg: #f3f6fa;
+  --kiosk-name-bg: #22344d;
+  --kiosk-name-fg: #f3f6fa;
+  --kiosk-out-normal-bg: #1d4e89;
+  --kiosk-out-warning-bg: #c62828;
+  --kiosk-out-critical-bg: #5c0000;
+  --kiosk-out-fg: #ffffff;
+  --kiosk-back-bg: #ffffff;
+  --kiosk-back-fg: #111111;
+}
+
+body { margin: 0; }

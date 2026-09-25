@@ -114,3 +114,37 @@ export function passesToTsv(passes: readonly PassRecord[], settings: Pick<Settin
   });
   return [header.join('\t'), ...rows].join('\n');
 }
+
+// ------------------------------------------------------------- class rhythm
+
+export interface RhythmSegment { kind: 'together' | 'out'; start: number; end: number; studentName?: string }
+export interface Rhythm { start: number; end: number; segments: RhythmSegment[]; togetherMs: number; outMs: number }
+
+/**
+ * Reconstruct a class period as alternating together/out intervals between
+ * `start` and `end`. Invalidated passes are ignored; an open pass runs to `now`.
+ * Overlapping passes (after corrections) merge into one out interval.
+ */
+export function classRhythm(passes: readonly PassRecord[], start: number, end: number, now = Date.now()): Rhythm {
+  const outs = passes
+    .filter((p) => p.status !== 'invalidated')
+    .map((p) => ({ start: Math.max(start, p.departedAt), end: Math.min(end, p.returnedAt ?? now), studentName: p.studentName }))
+    .filter((p) => p.end > p.start)
+    .sort((a, b) => a.start - b.start);
+  const segments: RhythmSegment[] = [];
+  let cursor = start;
+  for (const o of outs) {
+    const last = segments[segments.length - 1];
+    if (last?.kind === 'out' && o.start <= last.end) {
+      last.end = Math.max(last.end, o.end);
+      last.studentName = `${last.studentName}, ${o.studentName}`;
+    } else {
+      if (o.start > cursor) segments.push({ kind: 'together', start: cursor, end: o.start });
+      segments.push({ kind: 'out', start: o.start, end: o.end, studentName: o.studentName });
+    }
+    cursor = Math.max(cursor, o.end);
+  }
+  if (end > cursor) segments.push({ kind: 'together', start: cursor, end });
+  const outMs = segments.filter((s) => s.kind === 'out').reduce((t, s) => t + s.end - s.start, 0);
+  return { start, end, segments, outMs, togetherMs: end - start - outMs };
+}
