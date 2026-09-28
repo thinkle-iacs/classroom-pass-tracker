@@ -70,15 +70,32 @@ export async function pairKiosk(ctx: Ctx, auth: KioskAuth, input: { code: string
  * listeners re-evaluate right away, so the kiosk drops to its pairing screen.
  */
 export async function revokeKiosk(ctx: Ctx, auth: KioskAuth, uid: string, input: { kioskId: string }): Promise<{ ok: true }> {
-  await ctx.db.runTransaction(async (tx) => {
-    const kiosk = (await tx.get(kioskRef(ctx, input.kioskId))).data();
+  return revoke(ctx, auth, input.kioskId, (kiosk) => {
     if (!kiosk || kiosk.teacherUid !== uid) throw new HttpsError('not-found', 'Display not found.');
-    if (kiosk.revokedAt) return;
+  });
+}
+
+/**
+ * The display disconnects itself (hidden kiosk menu: "Disconnect" or "Switch to
+ * another class"). Same effect as the teacher's revoke, so the dashboard stops
+ * listing it. Idempotent; a record for another room is refused.
+ */
+export async function kioskUnpair(ctx: Ctx, auth: KioskAuth, claims: { kioskId: string; roomId: string }): Promise<{ ok: true }> {
+  return revoke(ctx, auth, claims.kioskId, (kiosk) => {
+    if (kiosk && kiosk.roomId !== claims.roomId) throw new HttpsError('permission-denied', 'This display is not paired.');
+  });
+}
+
+async function revoke(ctx: Ctx, auth: KioskAuth, kioskId: string, check: (kiosk: KioskDoc<Timestamp> | undefined) => void): Promise<{ ok: true }> {
+  await ctx.db.runTransaction(async (tx) => {
+    const kiosk = (await tx.get(kioskRef(ctx, kioskId))).data();
+    check(kiosk);
+    if (!kiosk || kiosk.revokedAt) return;
     const now = Timestamp.fromMillis(ctx.now());
-    tx.update(kioskRef(ctx, input.kioskId), { revokedAt: now });
+    tx.update(kioskRef(ctx, kioskId), { revokedAt: now });
     tx.update(refs(ctx.db).display(kiosk.roomId), { updatedAt: now });
   });
-  await auth.revokeRefreshTokens(kioskUid(input.kioskId)).catch((e: { code?: string }) => {
+  await auth.revokeRefreshTokens(kioskUid(kioskId)).catch((e: { code?: string }) => {
     if (e.code !== 'auth/user-not-found') throw e;
   });
   return { ok: true };

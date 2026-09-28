@@ -2,12 +2,14 @@
   // Everyone-present state: the sign-out list, under a screensaver while nobody is using it.
   import { Bar, Container } from 'contain-css-svelte';
   import { UNAVAILABLE_MESSAGE, type Availability } from '@pass/shared';
+  import { longPress } from '../lib/longPress';
   import RosterGrid from './RosterGrid.svelte';
   import ScreensaverOverlay from './ScreensaverOverlay.svelte';
   import type { KioskDisplay } from './state';
 
-  let { display, available, togetherMs, notice, disabled, onpick }: {
-    display: KioskDisplay; available: Availability; togetherMs: number | null; notice: string; disabled: boolean; onpick: (k: string) => void;
+  let { display, available, togetherMs, notice, disabled, onpick, onmenu }: {
+    display: KioskDisplay; available: Availability; togetherMs: number | null; notice: string; disabled: boolean;
+    onpick: (k: string) => void; onmenu: () => void;
   } = $props();
 
   const unavailable = $derived(!available.allowed && display.sectionTitle ? UNAVAILABLE_MESSAGE[available.reason!] : '');
@@ -15,7 +17,8 @@
 
 <div class="kiosk">
   <Bar primary marginBlock="0">
-    <h1>Class Signout</h1>
+    <!-- Hold the title to open the display menu (switch class / disconnect). -->
+    <h1 use:longPress={{ onpress: onmenu }}>Class Signout</h1>
     <p class="class">{display.sectionTitle ?? 'No class right now'}{display.blockLabel ? ` · ${display.blockLabel}` : ''}</p>
   </Bar>
   <div class="stage">
@@ -44,7 +47,8 @@
     --line-width: 100%; /* the roster is a <ul>; don't cap it at a reading measure */
     --bar-padding: 1.5vh 3vw;
   }
-  h1 { margin: 0; color: inherit; font-size: clamp(1.8rem, 3.4vw, 3rem); }
+  h1 { margin: 0; color: inherit; font-size: clamp(1.8rem, 3.4vw, 3rem); user-select: none; -webkit-touch-callout: none; transition: opacity 2.5s linear; }
+  h1:global(.holding) { opacity: 0.4; } /* the only cue that holding does something */
   .class { margin: 0; font-size: clamp(1.2rem, 2vw, 1.8rem); }
   .stage { position: relative; flex: 1; display: flex; flex-direction: column; }
   .stage > :global(*:first-child) { flex: 1; }

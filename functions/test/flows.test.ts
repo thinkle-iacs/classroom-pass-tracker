@@ -4,7 +4,7 @@ import { FieldValue, type Timestamp } from 'firebase-admin/firestore';
 import { FIXTURE_CLASSES, FIXTURE_ROSTERS } from '@pass/shared/fixtures';
 import type { DisplayDoc, PassDoc, RoomDoc, TeacherDoc } from '@pass/shared';
 import { invalidatePass, kioskReturn, kioskStartPass, reassignPass, teacherEndPass } from '../src/passes';
-import { createPairingCode, kioskHeartbeat, pairKiosk, revokeKiosk, PAIRING_TTL_MS } from '../src/pairing';
+import { createPairingCode, kioskHeartbeat, kioskUnpair, pairKiosk, revokeKiosk, PAIRING_TTL_MS } from '../src/pairing';
 import { setDisplayName, setPaused, setSectionOverride, updateSettings } from '../src/controls';
 import { refreshRoom } from '../src/room';
 import { sectionKeyFor } from '../src/identity';
@@ -294,6 +294,19 @@ describe('pairing', () => {
     ]);
     expect(codes).toEqual(['permission-denied', 'permission-denied', 'permission-denied']);
     expect(await codeOf(revokeKiosk(ctx, auth, newTeacher().uid, { kioskId: kiosk.kioskId }))).toBe('not-found');
+  });
+
+  it('a kiosk can disconnect itself, and then gets nothing', async () => {
+    const { ctx, auth, kiosk, pair } = await pairedRoom();
+    const other = await pair('Back table');
+    await expect(kioskUnpair(ctx, auth, kiosk)).resolves.toEqual({ ok: true });
+    await expect(kioskUnpair(ctx, auth, kiosk)).resolves.toEqual({ ok: true }); // idempotent
+    expect((await db.doc(`kiosks/${kiosk.kioskId}`).get()).get('revokedAt')).not.toBeNull();
+    expect(auth.revoked).toContain(kiosk.uid);
+    expect(await codeOf(kioskHeartbeat(ctx, kiosk))).toBe('permission-denied');
+    // Only itself: the room's other display keeps working.
+    await expect(kioskHeartbeat(ctx, other)).resolves.toHaveProperty('serverNow');
+    expect(await codeOf(kioskUnpair(ctx, auth, { ...other, roomId: 'someone-elses-room' }))).toBe('permission-denied');
   });
 
   it('a kiosk cannot act on another room with its own kiosk record', async () => {

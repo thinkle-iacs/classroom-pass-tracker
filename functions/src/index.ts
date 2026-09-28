@@ -10,7 +10,7 @@ import { schemas, type EndpointName, type Endpoints } from '@pass/shared';
 import type { z } from 'zod';
 import { requireKioskClaims, requirePrincipal } from './auth';
 import { setDisplayName as rename, setPaused as pause, setSectionOverride as override, updateSettings as settings } from './controls';
-import { createPairingCode as makeCode, kioskHeartbeat as heartbeat, pairKiosk as pair, revokeKiosk as revoke } from './pairing';
+import { createPairingCode as makeCode, kioskHeartbeat as heartbeat, kioskUnpair as unpair, pairKiosk as pair, revokeKiosk as revoke } from './pairing';
 import {
   invalidatePass as invalidate, kioskReturn as returnPass, kioskStartPass as startPass, reassignPass as reassign, teacherEndPass as endPass,
 } from './passes';
@@ -80,5 +80,6 @@ export const reassignPass = callable('reassignPass', (input, req) => reassign(ct
 
 export const pairKiosk = callable('pairKiosk', (input) => pair(ctx(), kioskAuth(), input));
 export const kioskHeartbeat = callable('kioskHeartbeat', (_, req) => heartbeat(ctx(), kiosk(req)));
+export const kioskUnpair = callable('kioskUnpair', (_, req) => unpair(ctx(), kioskAuth(), kiosk(req)));
 export const kioskStartPass = callable('kioskStartPass', (input, req) => startPass(ctx(), kiosk(req), input));
 export const kioskReturn = callable('kioskReturn', (input, req) => returnPass(ctx(), kiosk(req), input));

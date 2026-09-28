@@ -33,5 +33,6 @@ export function errorCode(e: unknown): string {
 
 export function errorMessage(e: unknown): string {
   const message = (e as { message?: unknown })?.message;
-  return typeof message === 'string' && message ? message : 'Something went wrong. Try again.';
+  // The callable SDK appends the HTTP status ("… [404]"); it means nothing to a teacher.
+  return typeof message === 'string' && message ? message.replace(/\s*\[\d{3}\]$/, '') : 'Something went wrong. Try again.';
 }

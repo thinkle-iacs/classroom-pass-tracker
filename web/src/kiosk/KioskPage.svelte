@@ -7,6 +7,7 @@
   import { connect, errorCode, errorMessage } from '../lib/firebase';
   import { liveDoc, online, ticker } from '../lib/live.svelte';
   import { wakeLock } from '../lib/wakeLock.svelte';
+  import KioskMenu from './KioskMenu.svelte';
   import OutScreen from './OutScreen.svelte';
   import PairingScreen from './PairingScreen.svelte';
   import PresentScreen from './PresentScreen.svelte';
@@ -20,6 +21,9 @@
   let serverOffset = $state(0);
   let busy = $state(false);
   let notice = $state('');
+  let menuOpen = $state(false);
+  /** Mid-switch, the old session's permission-denied is expected; don't let it sign out the new one. */
+  let switching = false;
 
   $effect(() => onAuthStateChanged(auth, async (u) => {
     const claims = u ? (await u.getIdTokenResult()).claims : null;
@@ -29,9 +33,29 @@
 
   /** Revoked, or the room is gone: back to the pairing screen. */
   async function unpair() {
+    if (switching) return;
     roomId = null;
     await signOut(auth);
   }
+
+  /** Revoke this display on the server (best effort: offline, the teacher can still revoke it), then sign out. */
+  async function leaveRoom() {
+    await call('kioskUnpair', {}).catch(() => {});
+    roomId = null;
+    await signOut(auth);
+  }
+  async function guarded(action: () => Promise<void>) {
+    switching = true;
+    try { await action(); } finally { switching = false; }
+  }
+  const disconnect = () => guarded(leaveRoom);
+
+  /** Shared rooms: check the new code first, so a typo leaves this display as it was. */
+  const switchTo = (code: string) => guarded(async () => {
+    const res = await call('pairKiosk', { code }).catch((e) => { throw new Error(errorMessage(e)); });
+    await leaveRoom();
+    await signInWithCustomToken(auth, res.token);
+  });
   const deniedMeansUnpaired = (e: FirestoreError) => { if (e.code === 'permission-denied') void unpair(); };
 
   const display = liveDoc<KioskDisplay>(() => (roomId ? doc(db, 'displays', roomId) : null), deniedMeansUnpaired);
@@ -99,10 +123,14 @@
   <p>Connecting…</p>
 {:else if out && display.value.active}
   <OutScreen name={out.name} elapsedMs={out.elapsedMs} level={out.level} thresholdMinutes={display.value.settings.attendanceThresholdMinutes}
-    busy={busy || offline} notice={offline ? 'Offline: reconnecting…' : notice} onreturn={() => act('kioskReturn', display.value!.active!.k)} />
+    busy={busy || offline} notice={offline ? 'Offline: reconnecting…' : notice} onmenu={() => (menuOpen = true)} onreturn={() => act('kioskReturn', display.value!.active!.k)} />
 {:else}
   <PresentScreen display={display.value} available={available!} togetherMs={since == null ? null : serverNow - since}
-    notice={offline ? 'Offline: reconnecting…' : notice} disabled={busy || offline} onpick={(k) => act('kioskStartPass', k)} />
+    notice={offline ? 'Offline: reconnecting…' : notice} disabled={busy || offline} onpick={(k) => act('kioskStartPass', k)}
+    onmenu={() => (menuOpen = true)} />
+{/if}
+{#if roomId}
+  <KioskMenu open={menuOpen} onclose={() => (menuOpen = false)} onswitch={switchTo} ondisconnect={disconnect} />
 {/if}
 {#if roomId && (wake.state === 'unsupported' || wake.state === 'denied')}
   <p class="sleep-note">This screen may go to sleep on its own.</p>

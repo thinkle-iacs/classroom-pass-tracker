@@ -25,6 +25,7 @@ export const schemas = {
   kioskHeartbeat: z.object({}).strict(),
   kioskStartPass: z.object({ k: opaqueId, requestId }).strict(),
   kioskReturn: z.object({ k: opaqueId, requestId }).strict(),
+  kioskUnpair: z.object({}).strict(),
 } as const;
 
 type Req<K extends keyof typeof schemas> = z.input<(typeof schemas)[K]>;
@@ -44,5 +45,6 @@ export interface Endpoints {
   kioskHeartbeat: { request: Req<'kioskHeartbeat'>; response: { serverNow: number } };
   kioskStartPass: { request: Req<'kioskStartPass'>; response: { passId: string; serverNow: number } };
   kioskReturn: { request: Req<'kioskReturn'>; response: { ok: true; serverNow: number } };
+  kioskUnpair: { request: Req<'kioskUnpair'>; response: { ok: true } };
 }
 export type EndpointName = keyof Endpoints;

@@ -113,8 +113,13 @@ synthetic data from `shared/src/fixtures.ts`. Any teacher email gets the same cl
 4. **Revoke** (`revokeKiosk`): set `revokedAt`, `auth.revokeRefreshTokens(uid)`, and touch
    `displays/{roomId}.updatedAt` so live listeners re-evaluate rules and get `permission-denied`.
    The kiosk treats permission-denied (listener or callable) as "unpaired": sign out and show the pairing screen.
-5. Brute force: 31⁶ ≈ 887M codes with a 10-min TTL. Add App Check and/or per-IP throttling before wide rollout (not MVP).
-6. **Prod gotcha:** `createCustomToken` needs the Functions runtime service account to hold
+5. **Switch or disconnect from the display itself** (shared rooms): holding the kiosk title (or the
+   "… is out" name) for 2.5s opens a hidden menu. *Switch* takes the other teacher's pairing code and
+   calls `pairKiosk` first, so a bad code changes nothing; then `kioskUnpair` (the kiosk revokes its own
+   record, same effect as `revokeKiosk`), sign out, and sign in with the new token. *Disconnect* is
+   `kioskUnpair` plus sign-out. Offline, the local sign-out still happens and the teacher can revoke later.
+6. Brute force: 31⁶ ≈ 887M codes with a 10-min TTL. Add App Check and/or per-IP throttling before wide rollout (not MVP).
+7. **Prod gotcha:** `createCustomToken` needs the Functions runtime service account to hold
    *Service Account Token Creator* (`iam.serviceAccounts.signBlob`). See firebase-setup.md.
 
 ### Current block (`refreshRoom`)
