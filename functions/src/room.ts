@@ -47,7 +47,7 @@ export async function ensureTeacher(ctx: Ctx, principal: { uid: string; email: s
     };
     tx.create(r.teacher(principal.uid), teacher);
     tx.create(r.room(teacher.roomId), room);
-    tx.create(r.display(teacher.roomId), buildDisplay(room, teacher, null, new Map(), now));
+    tx.create(r.display(teacher.roomId), buildDisplay(room, teacher, [], new Map(), now));
     return teacher;
   });
 }
@@ -68,13 +68,14 @@ export function computeCurrent(teacher: Pick<Teacher, 'sections'>, room: Pick<Ro
     const block = resolveCurrentBlock(sections, nowMs);
     if (!block) return null;
     return {
-      sectionKey: block.sectionKey, label: block.label, startMinutes: block.startMinutes, endMinutes: block.endMinutes,
+      sectionKey: block.sectionKey, sectionKeys: block.sectionKeys, label: block.label, startMinutes: block.startMinutes, endMinutes: block.endMinutes,
       startAt: at(block.startMinutes), endAt: at(block.endMinutes), dateKey: clock.dateKey, manual: false,
     };
   };
   const manual = room.manualDateKey === clock.dateKey ? teacher.sections.find((s) => s.key === room.manualSectionKey) : undefined;
   if (manual) {
-    return scheduled([manual]) ?? { sectionKey: manual.key, label: null, startMinutes: null, endMinutes: null, startAt: null, endAt: null, dateKey: clock.dateKey, manual: true };
+    // A hand-picked class shows alone, even if another class shares its block.
+    return scheduled([manual]) ?? { sectionKey: manual.key, sectionKeys: [manual.key], label: null, startMinutes: null, endMinutes: null, startAt: null, endAt: null, dateKey: clock.dateKey, manual: true };
   }
   return scheduled(teacher.sections);
 }
@@ -85,17 +86,30 @@ export function isStale(departedAt: Timestamp, nowMs: number): boolean {
 
 // ------------------------------------------------------------------- display
 
-/** The kiosk-safe projection. Only display names and per-room HMAC keys leave here. */
-export function buildDisplay(room: Room, teacher: Teacher, section: { title: string; studentIds: string[] } | null, students: ReadonlyMap<string, RosterStudentDoc>, now: Timestamp): Display {
+/** Sections meeting now, by key. Rooms stored before combined rosters only have `sectionKey`. */
+export const currentSectionKeys = (current: CurrentSection | null): string[] =>
+  current ? (current.sectionKeys?.length ? current.sectionKeys : [current.sectionKey]) : [];
+
+/** "English 10", or "English 10 & Journalism" when two classes share the block. */
+export function combinedTitle(sections: readonly { title: string }[]): string | null {
+  const titles = [...new Set(sections.map((s) => s.title))];
+  return titles.length ? titles.join(' & ') : null;
+}
+
+/**
+ * The kiosk-safe projection. Only display names and per-room HMAC keys leave here.
+ * Several sections in one block show as one combined roster.
+ */
+export function buildDisplay(room: Room, teacher: Teacher, sections: readonly { title: string; studentIds: string[] }[], students: ReadonlyMap<string, RosterStudentDoc>, now: Timestamp): Display {
   const current = room.current;
   const nameOf = (id: string) => { const s = students.get(id); return s ? effectiveName(s) : null; };
-  const roster = (section?.studentIds ?? [])
+  const roster = [...new Set(sections.flatMap((s) => s.studentIds))]
     .flatMap((id) => { const name = nameOf(id); return name ? [{ k: kioskKey(room.displaySalt, id), name }] : []; })
     .sort((a, b) => a.name.localeCompare(b.name));
   const active = room.activePass;
   const hasBlock = current && current.startMinutes != null && current.endMinutes != null && current.startAt != null && current.endAt != null;
   return {
-    sectionTitle: section?.title ?? null,
+    sectionTitle: combinedTitle(sections),
     blockLabel: current?.label ?? null,
     block: hasBlock ? { startMinutes: current.startMinutes!, endMinutes: current.endMinutes!, startAt: current.startAt!, endAt: current.endAt! } : null,
     manual: current?.manual ?? false,
@@ -149,9 +163,10 @@ export async function commitRoom(tx: Transaction, db: Firestore, loaded: LoadedR
   const { roomId, room, teacher } = loaded;
   const uid = room.teacherUid;
   const now = Timestamp.fromMillis(nowMs);
-  const sectionSnap = room.current ? await tx.get(r.section(uid, room.current.sectionKey)) : null;
-  const section = sectionSnap?.exists ? sectionSnap.data()! : null;
-  const ids = [...new Set([...(section?.studentIds ?? []), ...(room.activePass ? [room.activePass.appStudentId] : [])])];
+  const sectionKeys = currentSectionKeys(room.current);
+  const sectionSnaps = sectionKeys.length ? await tx.getAll(...sectionKeys.map((key) => r.section(uid, key))) : [];
+  const sections = sectionSnaps.flatMap((snap) => (snap.exists ? [snap.data()!] : []));
+  const ids = [...new Set([...sections.flatMap((s) => s.studentIds), ...(room.activePass ? [room.activePass.appStudentId] : [])])];
   const students = new Map<string, RosterStudentDoc>();
   if (ids.length) {
     const snaps = await tx.getAll(...ids.map((id) => r.student(uid, id)));
@@ -160,7 +175,7 @@ export async function commitRoom(tx: Transaction, db: Firestore, loaded: LoadedR
   loaded.studentEdits?.forEach((s, id) => { if (students.has(id)) students.set(id, s); });
   room.updatedAt = now;
   tx.set(r.room(roomId), room);
-  tx.set(r.display(roomId), buildDisplay(room, teacher, section, students, now));
+  tx.set(r.display(roomId), buildDisplay(room, teacher, sections, students, now));
   if (loaded.stalePassId) {
     tx.update(r.pass(loaded.stalePassId), {
       needsReview: true, updatedAt: now,

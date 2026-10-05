@@ -26,3 +26,21 @@ export function outState(display: KioskDisplay, serverNow: number): OutState | n
   const elapsedMs = Math.max(0, serverNow - display.active.departedAt.toMillis());
   return { name: display.active.name, elapsedMs, level: escalation(elapsedMs, display.settings) };
 }
+
+/** A tap the server hasn't confirmed yet. The kiosk shows its result right away. */
+export type PendingTap = { kind: 'out'; k: string; name: string; at: number } | { kind: 'in'; k: string; at: number };
+
+const millis = (ms: number): Millis => ({ toMillis: () => ms });
+
+/** The display as it will look once the pending tap lands. */
+export function withPending(display: KioskDisplay, pending: PendingTap | null): KioskDisplay {
+  if (!pending || pendingSettled(display, pending)) return display;
+  return pending.kind === 'out'
+    ? { ...display, active: { k: pending.k, name: pending.name, departedAt: millis(pending.at) } }
+    : { ...display, active: null, togetherSince: millis(pending.at) };
+}
+
+/** Has the server's display caught up with the tap? */
+export function pendingSettled(display: KioskDisplay, pending: PendingTap): boolean {
+  return pending.kind === 'out' ? display.active?.k === pending.k : display.active?.k !== pending.k;
+}

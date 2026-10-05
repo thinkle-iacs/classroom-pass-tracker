@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS } from '@pass/shared';
-import { kioskAvailability, outState, togetherSince, type KioskDisplay } from './state';
+import { kioskAvailability, outState, pendingSettled, togetherSince, withPending, type KioskDisplay } from './state';
 
 const ms = (n: number) => ({ toMillis: () => n });
 const START = 1_000_000_000_000;
@@ -34,5 +34,20 @@ describe('kiosk state', () => {
     expect(outState(out, START + 15 * MIN)?.level).toBe('critical');
     expect(outState(out, START - 5000)?.elapsedMs).toBe(0);
     expect(outState(display(), START)).toBeNull();
+  });
+
+  it('shows a tap before the server confirms it', () => {
+    const d = display({ roster: [{ k: 'a', name: 'Maya R.' }] });
+    const out = withPending(d, { kind: 'out', k: 'a', name: 'Maya R.', at: START + 20 * MIN });
+    expect(outState(out, START + 21 * MIN)).toMatchObject({ name: 'Maya R.', elapsedMs: MIN });
+    const confirmed = display({ active: { k: 'a', name: 'Maya R.', departedAt: ms(START + 20 * MIN + 300) } });
+    expect(pendingSettled(confirmed, { kind: 'out', k: 'a', name: 'Maya R.', at: START + 20 * MIN })).toBe(true);
+    expect(withPending(confirmed, { kind: 'out', k: 'a', name: 'Maya R.', at: START })).toBe(confirmed);
+
+    const back = withPending(confirmed, { kind: 'in', k: 'a', at: START + 25 * MIN });
+    expect(back.active).toBeNull();
+    expect(togetherSince(back)).toBe(START + 25 * MIN);
+    expect(pendingSettled(d, { kind: 'in', k: 'a', at: START })).toBe(true);
+    expect(withPending(d, null)).toBe(d);
   });
 });

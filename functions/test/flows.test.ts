@@ -8,18 +8,29 @@ import { createPairingCode, kioskHeartbeat, kioskUnpair, pairKiosk, revokeKiosk,
 import { setDisplayName, setPaused, setSectionOverride, updateSettings } from '../src/controls';
 import { refreshRoom } from '../src/room';
 import { sectionKeyFor } from '../src/identity';
-import { FixtureSource } from '../src/sis';
+import { FixtureSource, type SisSource } from '../src/sis';
 import { syncRoster } from '../src/sync';
 import { adminDb, codeOf, fakeAuth, MINUTE, MONDAY_10AM, newTeacher, testCtx } from './helpers';
 
 const db = adminDb();
 const B2 = sectionKeyFor('fx-class-eng10-b2'); // meets Monday 09:40-11:02
 
-async function pairedRoom() {
+/** The fixtures plus a second class in Monday's Block 2, sharing one student with English 10 B2. */
+const coTaught: SisSource = {
+  classesForTeacher: async () => [...(await new FixtureSource().classesForTeacher()),
+    { sourcedId: 'fx-class-film-b2', title: 'Film Studies', classCode: 'FILM-01', grades: ['10'], periods: ['Block 2(D1,D3)'], status: 'active' }],
+  students: async (classId) => classId === 'fx-class-film-b2'
+    ? [{ sourcedId: 'fx-stu-film-0', givenName: 'Wren', familyName: 'Ashby' }, { sourcedId: 'fx-stu-film-1', givenName: 'Juno', familyName: 'Vale' },
+      { ...FIXTURE_ROSTERS['fx-class-eng10-b2']![0]! }]
+    : new FixtureSource().students(classId),
+};
+const FILM = sectionKeyFor('fx-class-film-b2');
+
+async function pairedRoom(source: SisSource = new FixtureSource()) {
   const ctx = testCtx(db);
   const teacher = newTeacher();
   const auth = fakeAuth();
-  await syncRoster(ctx, teacher, new FixtureSource());
+  await syncRoster(ctx, teacher, source);
   const pair = async (label?: string) => {
     const { code } = await createPairingCode(ctx, teacher);
     const { kioskId, roomId } = await pairKiosk(ctx, auth, { code, label });
@@ -96,6 +107,32 @@ describe('sync and display', () => {
     ctx.set(Date.parse('2026-09-29T23:00:00Z')); // next evening: override expired
     await refreshRoom(ctx, kiosk.roomId);
     expect((await display()).roster).toEqual([]);
+  });
+
+  it('combines the rosters of two classes meeting in the same block', async () => {
+    const { ctx, teacher, kiosk, display, room, pass } = await pairedRoom(coTaught);
+    const eng = FIXTURE_ROSTERS['fx-class-eng10-b2']!;
+    const d = await display();
+    expect(d.sectionTitle).toBe('English 10 & Film Studies');
+    expect(d.block).toMatchObject({ startMinutes: 9 * 60 + 40, endMinutes: 11 * 60 + 2 });
+    expect(d.roster).toHaveLength(eng.length + 2); // the shared student appears once
+    expect(d.roster.map((s) => s.name)).toEqual(expect.arrayContaining(['Wren A.', 'Juno V.']));
+    expect((await room()).current?.sectionKeys).toEqual([B2, FILM].sort());
+
+    // A pass is filed under the student's own class.
+    const wren = d.roster.find((s) => s.name === 'Wren A.')!;
+    const { passId } = await kioskStartPass(ctx, kiosk, { k: wren.k, requestId: 'combined-0001' });
+    expect(await pass(passId)).toMatchObject({ sectionKey: FILM, sectionTitle: 'Film Studies', studentName: 'Wren A.' });
+    expect((await room()).activePass?.sectionKey).toBe(FILM);
+    await kioskReturn(ctx, kiosk, { k: wren.k, requestId: 'combined-0002' });
+
+    const json = JSON.stringify(await display());
+    for (const value of ['fx-class-film-b2', 'fx-stu-film-0', FILM, B2]) expect(json).not.toContain(value);
+
+    // Picking one class by hand shows just that class.
+    await setSectionOverride(ctx, teacher.uid, { sectionKey: FILM });
+    expect(await display()).toMatchObject({ sectionTitle: 'Film Studies', manual: false });
+    expect((await display()).roster).toHaveLength(3);
   });
 
   it('fills settings saved before the screensaver option existed', async () => {

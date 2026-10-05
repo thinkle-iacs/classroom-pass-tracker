@@ -4,7 +4,7 @@ import { HttpsError } from 'firebase-functions/v2/https';
 import { availability, effectiveName, schoolClock, UNAVAILABLE_MESSAGE, type Correction, type KioskDoc, type PassDoc } from '@pass/shared';
 import type { KioskClaims } from './auth';
 import { kioskKey } from './identity';
-import { commitRoom, loadRoom, mutateTeacherRoom, refs, settle, type Ctx, type LoadedRoom } from './room';
+import { commitRoom, currentSectionKeys, loadRoom, mutateTeacherRoom, refs, settle, type Ctx, type LoadedRoom } from './room';
 
 // Starting, returning and correcting passes. Stored times always come from the
 // Functions clock (ctx.now), never from a kiosk.
@@ -43,16 +43,22 @@ export async function kioskStartPass(ctx: Ctx, claims: KioskClaims, input: { k: 
     const allowed = availability({ paused: room.paused, block, manual: current?.manual ?? false, nowMinutes: schoolClock(nowMs).minutes, settings: teacher.settings });
     if (!allowed.allowed) throw new HttpsError('failed-precondition', UNAVAILABLE_MESSAGE[allowed.reason!], { reason: allowed.reason });
 
-    const sectionSnap = await tx.get(refs(ctx.db).section(room.teacherUid, current!.sectionKey));
-    const appStudentId = sectionSnap.data()?.studentIds.find((id) => kioskKey(room.displaySalt, id) === input.k);
-    if (!appStudentId) throw new HttpsError('not-found', 'That name is no longer on this roster.');
+    // With a combined roster, the pass is filed under the student's own section.
+    const sectionSnaps = await tx.getAll(...currentSectionKeys(current).map((key) => refs(ctx.db).section(room.teacherUid, key)));
+    let found: { sectionKey: string; sectionTitle: string; appStudentId: string } | undefined;
+    for (const snap of sectionSnaps) {
+      const appStudentId = snap.data()?.studentIds.find((id) => kioskKey(room.displaySalt, id) === input.k);
+      if (appStudentId) { found = { sectionKey: snap.id, sectionTitle: snap.data()!.title, appStudentId }; break; }
+    }
+    if (!found) throw new HttpsError('not-found', 'That name is no longer on this roster.');
+    const { appStudentId, sectionKey, sectionTitle } = found;
     const student = (await tx.get(refs(ctx.db).student(room.teacherUid, appStudentId))).data();
 
     const now = Timestamp.fromMillis(nowMs);
-    room.activePass = { passId, appStudentId, sectionKey: current!.sectionKey, departedAt: now };
+    room.activePass = { passId, appStudentId, sectionKey, departedAt: now };
     await commitRoom(tx, ctx.db, loaded, nowMs);
     const pass: Pass = {
-      roomId: claims.roomId, teacherUid: room.teacherUid, sectionKey: current!.sectionKey, sectionTitle: sectionSnap.data()!.title,
+      roomId: claims.roomId, teacherUid: room.teacherUid, sectionKey, sectionTitle,
       appStudentId, studentName: student ? effectiveName(student) : 'A student',
       departedAt: now, returnedAt: null, status: 'active', startSource: 'kiosk', endSource: null, kioskId: claims.kioskId,
       needsReview: false, corrections: [], createdAt: now, updatedAt: now,

@@ -80,7 +80,10 @@ export interface RosterStudentDoc {
 }
 
 export interface CurrentSection {
+  /** The first section by key; passes started now are filed under the student's own section. */
   sectionKey: string;
+  /** Every section meeting in this block. The display combines their rosters. */
+  sectionKeys: string[];
   label: string | null;
   startMinutes: number | null;
   endMinutes: number | null;

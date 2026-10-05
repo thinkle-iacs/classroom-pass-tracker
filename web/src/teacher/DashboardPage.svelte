@@ -6,7 +6,7 @@
   import { Bar, Button, Inline, Text } from 'contain-css-svelte';
   import { effectiveName, withDefaults, type DisplayDoc, type EndpointName, type Endpoints, type KioskDoc, type PassDoc, type RosterStudentDoc, type RoomDoc, type Settings, type TeacherDoc } from '@pass/shared';
   import { connect, errorMessage, useEmulators } from '../lib/firebase';
-  import { liveDoc, liveQuery, ticker } from '../lib/live.svelte';
+  import { liveDoc, liveQuery, optimistic, ticker } from '../lib/live.svelte';
   import { toPassRow, type Millis } from '../lib/records';
   import ConnectDisplay from './ConnectDisplay.svelte';
   import LiveStatus from './LiveStatus.svelte';
@@ -40,7 +40,16 @@
   const clock = ticker(1000);
 
   const passes = $derived(passDocs.value.map(toPassRow));
-  const active = $derived(passes.find((p) => p.id === room.value?.activePass?.passId) ?? null);
+  // Live controls show their result before the server confirms it.
+  const paused = optimistic(() => room.value?.paused ?? false);
+  const manualKey = optimistic(() => (room.value && room.value.manualDateKey === room.value.current?.dateKey ? room.value.manualSectionKey : null));
+  const activeId = optimistic(() => room.value?.activePass?.passId ?? null);
+  const active = $derived(passes.find((p) => p.id === activeId.value) ?? null);
+  const current = $derived.by(() => {
+    const picked = manualKey.pending && manualKey.value !== null ? teacher.value?.sections.find((s) => s.key === manualKey.value) : undefined;
+    if (picked) return { title: picked.title, label: null, manual: true };
+    return { title: display.value?.sectionTitle ?? null, label: display.value?.blockLabel ?? null, manual: display.value?.manual ?? false };
+  });
   const review = $derived(passes.filter((p) => p.needsReview && p.status === 'active'));
   const settings: Settings = $derived(withDefaults(teacher.value?.settings));
   const roster = $derived(studentDocs.value.filter((s) => s.sectionKeys.length).sort((a, b) => a.familyName.localeCompare(b.familyName) || a.givenName.localeCompare(b.givenName)));
@@ -104,13 +113,12 @@
       <p>{syncing ? 'Loading your classes from Aspen…' : 'Setting up…'}</p>
     {:else}
       {#if room.value}
-        <LiveStatus sections={teacher.value.sections} manualKey={room.value.manualDateKey === room.value.current?.dateKey ? room.value.manualSectionKey : null}
-          current={{ title: display.value?.sectionTitle ?? null, label: display.value?.blockLabel ?? null, manual: display.value?.manual ?? false }}
-          paused={room.value.paused} {active} {settings} now={clock.now} {busy}
-          onOverride={(sectionKey) => run('setSectionOverride', { sectionKey })}
-          onPause={(paused) => run('setPaused', { paused })}
-          onEnd={(passId) => run('teacherEndPass', { passId })}
-          onInvalidate={(passId) => { const n = note('invalidate this pass'); if (n !== null) run('invalidatePass', { passId, note: n }); }} />
+        <LiveStatus sections={teacher.value.sections} manualKey={manualKey.value} {current}
+          paused={paused.value} {active} {settings} now={clock.now} {busy}
+          onOverride={(sectionKey) => manualKey.set(sectionKey, () => run('setSectionOverride', { sectionKey }))}
+          onPause={(next) => paused.set(next, () => run('setPaused', { paused: next }))}
+          onEnd={(passId) => activeId.set(null, () => run('teacherEndPass', { passId }))}
+          onInvalidate={(passId) => { const n = note('invalidate this pass'); if (n !== null) activeId.set(null, () => run('invalidatePass', { passId, note: n })); }} />
       {/if}
       <NeedsReview passes={review} {busy}
         onEnd={(passId, returnedAt) => run('teacherEndPass', { passId, returnedAt })}

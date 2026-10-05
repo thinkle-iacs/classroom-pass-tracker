@@ -70,6 +70,13 @@ describe('resolveCurrentBlock', () => {
     expect(b?.sectionKey).toBe('ela7');
     expect(b?.label).toBe('C Block');
   });
+  it('returns every section that meets in the same block', () => {
+    const shared = [...sections, { key: 'ced-b1', grades: ['10'], meetings: parseMeetings(['Block 1(D1,D2)']) }];
+    const b = resolveCurrentBlock(shared, at('2026-09-21T08:30:00'));
+    expect(b?.sectionKey).toBe('ced-b1');
+    expect(b?.sectionKeys).toEqual(['ced-b1', 'eng-b1']);
+    expect(resolveCurrentBlock(shared, at('2026-09-21T11:03:00'))?.sectionKeys).toEqual(['jour-b3']);
+  });
   it('returns null outside class and on weekends', () => {
     expect(resolveCurrentBlock(sections, at('2026-09-21T16:00:00'))).toBeNull();
     expect(resolveCurrentBlock(sections, at('2026-09-26T09:00:00'))).toBeNull();

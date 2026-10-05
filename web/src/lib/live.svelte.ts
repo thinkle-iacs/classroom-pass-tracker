@@ -59,3 +59,22 @@ export function online(): { readonly value: boolean } {
   });
   return { get value() { return value; } };
 }
+
+/**
+ * A server value with an optimistic local guess on top. `set` shows the guess at
+ * once and runs the call; the guess goes away when the server agrees, or right
+ * away if the call fails (it resolves to undefined).
+ */
+export function optimistic<T>(actual: () => T): { readonly value: T; readonly pending: boolean; set(guess: T, call: () => Promise<unknown>): Promise<void> } {
+  let guess = $state.raw<{ value: T } | null>(null);
+  $effect(() => { if (guess && Object.is(actual(), guess.value)) guess = null; });
+  return {
+    get value() { return guess ? guess.value : actual(); },
+    get pending() { return guess !== null; },
+    async set(value, call) {
+      const mine = { value };
+      guess = mine;
+      if ((await call()) === undefined && guess === mine) guess = null;
+    },
+  };
+}

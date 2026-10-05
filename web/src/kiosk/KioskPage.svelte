@@ -11,7 +11,7 @@
   import OutScreen from './OutScreen.svelte';
   import PairingScreen from './PairingScreen.svelte';
   import PresentScreen from './PresentScreen.svelte';
-  import { kioskAvailability, outState, togetherSince, type KioskDisplay } from './state';
+  import { kioskAvailability, outState, pendingSettled, togetherSince, withPending, type KioskDisplay, type PendingTap } from './state';
 
   const HEARTBEAT_MS = 60_000;
   const { auth, db, call } = connect('kiosk');
@@ -22,6 +22,8 @@
   let busy = $state(false);
   let notice = $state('');
   let menuOpen = $state(false);
+  /** The tap in flight, shown before the server confirms it (cleared once the display catches up, or on error). */
+  let pending = $state.raw<PendingTap | null>(null);
   /** Mid-switch, the old session's permission-denied is expected; don't let it sign out the new one. */
   let switching = false;
 
@@ -58,13 +60,15 @@
   });
   const deniedMeansUnpaired = (e: FirestoreError) => { if (e.code === 'permission-denied') void unpair(); };
 
-  const display = liveDoc<KioskDisplay>(() => (roomId ? doc(db, 'displays', roomId) : null), deniedMeansUnpaired);
+  const server = liveDoc<KioskDisplay>(() => (roomId ? doc(db, 'displays', roomId) : null), deniedMeansUnpaired);
   const clock = ticker(500);
   const isOnline = online();
   const wake = wakeLock(() => !!roomId);
 
   const serverNow = $derived(clock.now + serverOffset);
-  const offline = $derived(!isOnline.value || (display.value != null && display.fromCache));
+  const display = { get value() { return server.value ? withPending(server.value, pending) : null; } };
+  $effect(() => { if (pending && server.value && pendingSettled(server.value, pending)) pending = null; });
+  const offline = $derived(!isOnline.value || (server.value != null && server.fromCache));
   const out = $derived(display.value ? outState(display.value, serverNow) : null);
   const available = $derived(display.value ? kioskAvailability(display.value, serverNow) : null);
   const since = $derived(display.value ? togetherSince(display.value) : null);
@@ -99,13 +103,22 @@
     setTimeout(() => { if (notice === message) notice = ''; }, 4000);
   }
 
-  /** One requestId per tap, so a retried or doubled call can't make two passes. */
-  async function act(name: 'kioskStartPass' | 'kioskReturn', k: string) {
+  /**
+   * One requestId per tap, so a retried or doubled call can't make two passes.
+   * The screen changes at once; the server's answer confirms it or rolls it back.
+   */
+  async function act(endpoint: 'kioskStartPass' | 'kioskReturn', k: string) {
     if (busy || offline) return;
     busy = true;
+    const student = display.value?.roster.find((s) => s.k === k)?.name ?? 'A student';
+    const tap: PendingTap = endpoint === 'kioskStartPass' ? { kind: 'out', k, name: student, at: serverNow } : { kind: 'in', k, at: serverNow };
+    pending = tap;
     try {
-      await call(name, { k, requestId: crypto.randomUUID() });
+      await call(endpoint, { k, requestId: crypto.randomUUID() });
+      // Normally the display snapshot clears it; don't hold a guess forever if it never matches.
+      setTimeout(() => { if (pending === tap) pending = null; }, 10_000);
     } catch (e) {
+      if (pending === tap) pending = null;
       const code = errorCode(e);
       if (code === 'permission-denied' || code === 'unauthenticated') await unpair();
       else flash(code === 'not-found' ? 'The roster just changed. Try again.' : errorMessage(e));

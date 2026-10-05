@@ -128,6 +128,10 @@ All math is in America/New_York via `schoolClock()`; never use `Date#getHours()`
 - A section meets when its parsed meeting `{day, periodId}` equals a bell period in the schedule for
   the section's grade band (HS vs. MS grade) on that weekday. Letter rotation doesn't matter.
 - Rosters appear `LEAD_MINUTES` (10) before a block starts, during passing time.
+- Sections meeting in the same block (same start and end, e.g. two classes taught together or a
+  cross-listed pair) are all returned in `current.sectionKeys`. The display shows one combined roster
+  (a student in both appears once) titled "English 10 & Film Studies". A pass is filed under the
+  student's own section (first by key if they're in both). Picking one class by hand shows only that class.
 - Manual override: `rooms.manualSectionKey` counts only when `manualDateKey` = today, so it expires
   overnight. If the chosen section is also scheduled now, use its block times. Otherwise `manual: true`
   with null times, and the start/end windows don't apply.
@@ -182,6 +186,12 @@ gets silently overwritten.
   threshold reached"). Show elapsed time only, never a countdown.
 - Together timer: `since = max(togetherSince, block.startAt)`, so it resets each class.
 
+### Optimistic taps
+A tap changes the screen at once: `withPending()` (`web/src/kiosk/state.ts`) lays the pending sign-out
+or return over the display doc until the server's display catches up, and drops it if the call fails.
+The dashboard's live controls (pause, class override, end/invalidate) do the same with
+`optimistic()` in `live.svelte.ts`. Stored times still come from the server.
+
 ### Wake lock
 A small `wakeLock.svelte.ts` helper: `navigator.wakeLock?.request('screen')`, re-request on
 `visibilitychange` to visible, release on leaving kiosk mode, and show a subtle "screen may sleep" note if
@@ -220,4 +230,3 @@ Indexes are in `firestore.indexes.json`.
   but the extension shows Adv/L until 13:19. Confirm times in `shared/src/schedule/bells.ts`.
 - **HS letters per day** come from the extension's 2024 file. They're display-only, so confirm or remove.
 - **Holidays, half days, assemblies:** no calendar source exists anywhere in prior art. The manual override covers it for MVP.
-- **Cross-listed sections** that meet at the same time: first by key wins, and the teacher can override. Consider merging rosters.
