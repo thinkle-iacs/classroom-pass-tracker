@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Button, Container, Form, FormItem, Input, Option, Select, Text } from 'contain-css-svelte';
+  import DrawingPreview from './DrawingPreview.svelte';
   import { DEFAULT_SETTINGS, SCREENSAVERS, settingsSchema, type Settings } from '@pass/shared';
 
   let { settings, busy, onSave }: { settings: Settings; busy: boolean; onSave: (s: Settings) => void } = $props();
@@ -34,6 +35,7 @@
         {#each Object.entries(SCREENSAVERS) as [id, name] (id)}<Option value={id}>{name}</Option>{/each}
       </Select>
     </FormItem>
+    <DrawingPreview pattern={form.screensaver} />
     {#if !parsed.success}<p><Text danger>{parsed.error.issues[0]?.message}</Text></p>{/if}
     <Button primary type="submit" disabled={busy || !parsed.success}>Save settings</Button>
   </Form>
