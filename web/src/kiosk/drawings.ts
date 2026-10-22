@@ -4,7 +4,7 @@
 // maps "time everyone has been here" to how much has been traced, so the
 // drawing is a pure function of that time: it keeps going while hidden, and
 // picks up where it was after a reload.
-import type { Screensaver } from '@pass/shared';
+import type { Screensaver, ScreensaverChoice } from '@pass/shared';
 
 export type Point = readonly [number, number];
 export type Segment = readonly [Point, Point];
@@ -182,6 +182,15 @@ export function bouncingTriangle(legs = 600, seed = 20261022): Generations {
     [x, y] = [nx, ny];
   }
   return gens;
+}
+
+/** The drawing to show for a setting; 'random' means `pick()`, which the kiosk calls once per page load. */
+export function resolveScreensaver(choice: ScreensaverChoice, pick: () => Screensaver = () => randomScreensaver()): Screensaver {
+  return choice === 'random' ? pick() : choice;
+}
+export function randomScreensaver(random = Math.random): Screensaver {
+  const all = Object.keys(DRAWING_STYLE) as Screensaver[];
+  return all[Math.floor(random() * all.length)]!;
 }
 
 export type Flat = Exclude<Screensaver, 'sierpinski'>;

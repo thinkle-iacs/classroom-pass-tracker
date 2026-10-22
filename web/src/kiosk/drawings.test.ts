@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BOUNCE_ASPECT, bouncingTriangle, DRAWINGS, FULL_DRAWING_MS, koch, progressAt, project, sierpinskiTetrahedron, sierpinskiTriangle, stitching, steadyProgressAt, traced, type Segment } from './drawings';
+import { BOUNCE_ASPECT, DRAWING_STYLE, randomScreensaver, resolveScreensaver, bouncingTriangle, DRAWINGS, FULL_DRAWING_MS, koch, progressAt, project, sierpinskiTetrahedron, sierpinskiTriangle, stitching, steadyProgressAt, traced, type Segment } from './drawings';
 import { PALETTES, paletteFor } from './palettes';
 
 const inside = (segs: Segment[]) => segs.flat().every(([x, y]) => x >= 0 && x <= 1 && y >= 0 && y <= 1);
@@ -86,6 +86,19 @@ describe('bouncing triangle', () => {
     for (let g = 0; g < p.generation; g++) travelled += len([legs[g]![0]!]);
     travelled += len([legs[p.generation]![0]!]) * p.fraction;
     expect(travelled).toBeCloseTo(1, 6);
+  });
+});
+
+describe('random screensaver', () => {
+  it('resolves random once through the picker, and leaves a chosen drawing alone', () => {
+    expect(resolveScreensaver('random', () => 'koch')).toBe('koch');
+    expect(resolveScreensaver('tree', () => 'koch')).toBe('tree');
+  });
+  it('can reach every drawing, and only drawings', () => {
+    const all = Object.keys(DRAWING_STYLE);
+    const seen = new Set(all.map((_, i) => randomScreensaver(() => (i + 0.5) / all.length)));
+    expect([...seen].sort()).toEqual([...all].sort());
+    expect(randomScreensaver(() => 0.999999)).toBeDefined();
   });
 });
 

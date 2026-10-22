@@ -1,3 +1,8 @@
+<script module lang="ts">
+  // Chosen once per page load, so "random" stays on one drawing while the kiosk is up.
+  const loadPick = randomScreensaver();
+</script>
+
 <script lang="ts">
   // Everyone-present state: the sign-out list, under a screensaver while nobody is using it.
   import { Bar, Container } from 'contain-css-svelte';
@@ -5,6 +10,7 @@
   import { longPress } from '../lib/longPress';
   import RosterGrid from './RosterGrid.svelte';
   import ScreensaverOverlay from './ScreensaverOverlay.svelte';
+  import { randomScreensaver, resolveScreensaver } from './drawings';
   import type { KioskDisplay } from './state';
 
   let { display, available, togetherMs, notice, disabled, onpick, onmenu }: {
@@ -29,7 +35,7 @@
       {/if}
     </Container>
     {#if togetherMs != null && !notice}
-      <ScreensaverOverlay everyoneHereMs={togetherMs} pattern={display.settings.screensaver ?? 'sierpinski'}
+      <ScreensaverOverlay everyoneHereMs={togetherMs} pattern={resolveScreensaver(display.settings.screensaver ?? 'sierpinski', () => loadPick)}
         hint={unavailable || 'Move the mouse or tap the screen to sign out'} />
     {/if}
   </div>
