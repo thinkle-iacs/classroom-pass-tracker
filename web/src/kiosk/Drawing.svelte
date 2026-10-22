@@ -3,7 +3,7 @@
   // `elapsedMs` (time everyone has been here), so it resumes where it was.
   // Flat patterns turn in the plane; solids spin in 3D with depth shading.
   import type { Screensaver } from '@pass/shared';
-  import { cameraAt, DRAWING_STYLE, DRAWINGS, isSolid, motionAt, progressAt, project, SOLIDS, traced, type Point, type Point3 } from './drawings';
+  import { cameraAt, DRAWING_STYLE, DRAWINGS, isSolid, motionAt, progressAt, project, steadyProgressAt, SOLIDS, traced, type Point, type Point3 } from './drawings';
 
   let { pattern, elapsedMs, running, colors }: { pattern: Screensaver; elapsedMs: number; running: boolean; colors: readonly string[] } = $props();
 
@@ -37,7 +37,7 @@
       const ah = h * 0.82; // fit above the caption band; while turning it may spill anywhere
       const { dx, dy, angle } = motionAt(style, t);
       const count = (flat ?? solid)!.length;
-      const { generation, fraction } = progressAt(count, t);
+      const { generation, fraction } = style.steady ? steadyProgressAt(flat!, style.steady.speed, t) : progressAt(count, t);
       const width = (g: number) => Math.max(1.2, (3.2 - g * 0.35) * style.line) * dpr;
       const pen = (x: number, y: number, g: number) => {
         ctx.globalAlpha = 0.95;
@@ -80,8 +80,37 @@
       ctx.rotate(angle);
       ctx.translate(-px, -py);
       const at = (p: Point) => [ox + p[0] * sx, oy + p[1] * sy] as const;
-      for (let g = 0; g <= generation; g++) {
+      for (let g = style.steady ? Math.max(0, generation - style.steady.trail) : 0; g <= generation; g++) {
         const segs = g < generation ? flat![g]! : traced(flat![g]!, fraction);
+        if (style.steady) {
+          // Constant weight; older legs fade out, and the pen is a triangle pointing the way it's heading.
+          ctx.lineWidth = 3 * style.line * dpr;
+          ctx.strokeStyle = colorOf(g);
+          ctx.globalAlpha = 0.9 * (1 - (generation - g) / (style.steady.trail + 1));
+          ctx.beginPath();
+          for (const [a, b] of segs) { ctx.moveTo(...at(a)); ctx.lineTo(...at(b)); }
+          ctx.stroke();
+          const seg = segs[segs.length - 1];
+          if (g === generation && seg) {
+            const [hx, hy] = at(seg[1]), [tx, ty] = at(seg[0]);
+            const size = 15 * style.line * dpr;
+            ctx.translate(hx, hy);
+            ctx.rotate(Math.atan2(hy - ty, hx - tx));
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = colorOf(g);
+            ctx.beginPath();
+            ctx.moveTo(size * 0.6, 0);
+            ctx.lineTo(-size * 0.6, size * 0.5);
+            ctx.lineTo(-size * 0.6, -size * 0.5);
+            ctx.closePath();
+            ctx.fill();
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.translate(px + dx * w, py + dy * h);
+            ctx.rotate(angle);
+            ctx.translate(-px, -py);
+          }
+          continue;
+        }
         ctx.lineWidth = width(g);
         ctx.strokeStyle = colorOf(g);
         ctx.globalAlpha = g === generation ? 0.9 : 0.6;

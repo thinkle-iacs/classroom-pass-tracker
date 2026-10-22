@@ -143,8 +143,49 @@ export function tree(levels = 10): Generations {
   return gens;
 }
 
+/** Kiosk screens are wide; the bouncing triangle's box is this much wider than tall. */
+export const BOUNCE_ASPECT = 16 / 9;
+
+/**
+ * A triangle's path as it bounces around a wide box: one generation per leg, so
+ * each reflection starts a new colour. Headings are chosen in screen space
+ * (never near-horizontal or near-vertical, which would crawl along an edge), a
+ * fixed seed keeps it the same on every reload, and the legs are returned in
+ * unit-square coordinates like every other drawing.
+ */
+export function bouncingTriangle(legs = 400, seed = 20261022): Generations {
+  let state = seed;
+  const random = () => { // mulberry32
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const margin = 0.03;
+  const [x0, x1, y0, y1] = [margin, BOUNCE_ASPECT - margin, margin, 1 - margin];
+  // Fresh heading in one of the four diagonal-ish sectors, 20°-70° off the axes.
+  const heading = () => {
+    const a = ((20 + random() * 50) * Math.PI) / 180;
+    return [Math.cos(a) * (random() < 0.5 ? -1 : 1), Math.sin(a) * (random() < 0.5 ? -1 : 1)] as const;
+  };
+  let [x, y] = [BOUNCE_ASPECT / 2, 0.5];
+  let [vx, vy] = heading();
+  const gens: Generations = [];
+  for (let i = 0; i < legs; i++) {
+    const tx = vx > 0 ? (x1 - x) / vx : (x0 - x) / vx;
+    const ty = vy > 0 ? (y1 - y) / vy : (y0 - y) / vy;
+    const t = Math.min(tx, ty);
+    const nx = x + vx * t, ny = y + vy * t;
+    gens.push([[[x / BOUNCE_ASPECT, y], [nx / BOUNCE_ASPECT, ny]]]);
+    if (tx <= ty) vx = -vx;
+    if (ty <= tx) vy = -vy;
+    [x, y] = [nx, ny];
+  }
+  return gens;
+}
+
 export type Flat = Exclude<Screensaver, 'sierpinski'>;
-export const DRAWINGS: Record<Flat, () => Generations> = { triangle: sierpinskiTriangle, koch, stitching, tree };
+export const DRAWINGS: Record<Flat, () => Generations> = { triangle: sierpinskiTriangle, koch, stitching, tree, bounce: bouncingTriangle };
 export const SOLIDS: Record<Exclude<Screensaver, Flat>, () => Segment3[][]> = { sierpinski: sierpinskiTetrahedron };
 export const isSolid = (p: Screensaver): p is Exclude<Screensaver, Flat> => p in SOLIDS;
 
@@ -156,7 +197,13 @@ export const isSolid = (p: Screensaver): p is Exclude<Screensaver, Flat> => p in
  * `rockDeg` is a gentle back-and-forth instead. Solids spin `spinMs` about their
  * vertical axis, seen from `tiltDeg` above, nodding by `wobbleDeg`.
  */
-export interface DrawingStyle { aspect: number; line: number; pivot: Point; spinMs?: number; rockDeg?: number; tiltDeg?: number; wobbleDeg?: number }
+/**
+ * A pen that travels at a constant speed (screen heights per second) instead of
+ * following the elaboration schedule, drawing a triangle in its direction of
+ * travel and keeping only the last `trail` legs, fading with age.
+ */
+export interface Steady { speed: number; trail: number }
+export interface DrawingStyle { aspect: number; line: number; pivot: Point; spinMs?: number; rockDeg?: number; tiltDeg?: number; wobbleDeg?: number; steady?: Steady }
 export const DRAWING_STYLE: Record<Screensaver, DrawingStyle> = {
   sierpinski: { aspect: 1, line: 1.5, pivot: [0.5, 0.5], spinMs: 4 * 60_000, tiltDeg: 16, wobbleDeg: 10 },
   // Equilateral, spinning about its centroid; the tips may sweep off screen, which is fine.
@@ -164,6 +211,8 @@ export const DRAWING_STYLE: Record<Screensaver, DrawingStyle> = {
   koch: { aspect: 1, line: 1, pivot: [0.5, 0.5], spinMs: 6 * 60_000 },
   stitching: { aspect: 1, line: 1, pivot: [0.5, 0.5], spinMs: 5 * 60_000 },
   tree: { aspect: 1, line: 1, pivot: [0.5, 0.98], rockDeg: 3 }, // sways from the base
+  // Slow enough to follow across a room (~12 s edge to edge); the last dozen legs linger.
+  bounce: { aspect: BOUNCE_ASPECT, line: 1.3, pivot: [0.5, 0.5], steady: { speed: 0.09, trail: 12 } },
 };
 
 const ROCK_MS = 90_000;
@@ -206,8 +255,7 @@ const GROWTH = 1.35;
 export interface Progress { generation: number; fraction: number; done: boolean }
 
 /** Which generation is being traced at `elapsedMs`, and how far through it. */
-export function progressAt(generationCount: number, elapsedMs: number, totalMs = FULL_DRAWING_MS): Progress {
-  const weights = Array.from({ length: generationCount }, (_, g) => GROWTH ** g);
+export function progressAt(generationCount: number, elapsedMs: number, totalMs = FULL_DRAWING_MS, weights = Array.from({ length: generationCount }, (_, g) => GROWTH ** g)): Progress {
   const unit = totalMs / weights.reduce((a, b) => a + b, 0);
   let t = Math.max(0, elapsedMs);
   for (let g = 0; g < generationCount; g++) {
@@ -235,4 +283,10 @@ export function traced<S extends readonly [Vec, Vec]>(gen: readonly S[], fractio
     break;
   }
   return out;
+}
+
+/** Progress for a constant-speed pen: each generation takes time in proportion to its length, so the pen never speeds up or slows down. */
+export function steadyProgressAt(gens: Generations, speed: number, elapsedMs: number): Progress {
+  const lengths = gens.map((gen) => gen.reduce((sum, s) => sum + length([[s[0][0] * BOUNCE_ASPECT, s[0][1]], [s[1][0] * BOUNCE_ASPECT, s[1][1]]]), 0));
+  return progressAt(gens.length, elapsedMs, (lengths.reduce((a, b) => a + b, 0) / speed) * 1000, lengths);
 }

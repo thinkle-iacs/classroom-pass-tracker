@@ -21,6 +21,7 @@ export const SCREENSAVERS = {
   stitching: 'Curve stitching (lines between axes)',
   koch: 'Koch snowflake',
   tree: 'Fractal tree',
+  bounce: 'Bouncing triangle (new colour at every edge)',
 } as const;
 export type Screensaver = keyof typeof SCREENSAVERS;
 const screensaverIds = Object.keys(SCREENSAVERS) as [Screensaver, ...Screensaver[]];
