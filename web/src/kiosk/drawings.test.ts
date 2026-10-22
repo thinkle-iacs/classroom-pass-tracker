@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DRAWINGS, FULL_DRAWING_MS, koch, progressAt, project, sierpinskiTetrahedron, sierpinskiTriangle, stitching, traced, type Segment } from './drawings';
+import { BOUNCE_ASPECT, DRAWING_STYLE, randomScreensaver, resolveScreensaver, bouncingTriangle, DRAWINGS, FULL_DRAWING_MS, koch, progressAt, project, sierpinskiTetrahedron, sierpinskiTriangle, stitching, steadyProgressAt, traced, type Segment } from './drawings';
 import { PALETTES, paletteFor } from './palettes';
 
 const inside = (segs: Segment[]) => segs.flat().every(([x, y]) => x >= 0 && x <= 1 && y >= 0 && y <= 1);
@@ -56,6 +56,49 @@ describe('screensaver drawings', () => {
     expect(traced(gen, 0.75)).toEqual([[[0, 0], [1, 0]], [[1, 0], [1, 0.5]]]);
     expect(traced(gen, 1)).toEqual(gen);
     expect(traced(gen, 0)).toEqual([]);
+  });
+});
+
+describe('bouncing triangle', () => {
+  const legs = bouncingTriangle(60);
+  it('is a connected path that reflects off the edges at equal angles', () => {
+    expect(legs).toHaveLength(60);
+    const dir = (i: number) => { const [a, b] = legs[i]![0]!; const dx = (b[0] - a[0]) * BOUNCE_ASPECT, dy = b[1] - a[1]; return [dx, dy, Math.hypot(dx, dy)] as const; };
+    for (let i = 1; i < legs.length; i++) {
+      expect(legs[i]![0]![0][0]).toBeCloseTo(legs[i - 1]![0]![1][0], 9);
+      expect(legs[i]![0]![0][1]).toBeCloseTo(legs[i - 1]![0]![1][1], 9);
+      // Speed along each axis is unchanged by a reflection; only signs flip.
+      const [ax, ay, al] = dir(i - 1), [bx, by, bl] = dir(i);
+      expect(Math.abs(bx / bl)).toBeCloseTo(Math.abs(ax / al), 9);
+      expect(Math.abs(by / bl)).toBeCloseTo(Math.abs(ay / al), 9);
+    }
+  });
+  it('stays in the box, is the same every time, and moves at a constant speed', () => {
+    expect(inside(legs.flat())).toBe(true);
+    expect(bouncingTriangle(60)).toEqual(legs);
+    const at = (ms: number) => steadyProgressAt(legs, 0.1, ms);
+    expect(at(0)).toMatchObject({ generation: 0, fraction: 0 });
+    expect(at(1e9)).toMatchObject({ done: true });
+    // Ten seconds at 0.1 screen heights per second is one screen height of travel, wherever it falls.
+    const len = ([[a, b]]: [Segment]) => Math.hypot((b[0] - a[0]) * BOUNCE_ASPECT, b[1] - a[1]);
+    let travelled = 0;
+    const p = at(10_000);
+    for (let g = 0; g < p.generation; g++) travelled += len([legs[g]![0]!]);
+    travelled += len([legs[p.generation]![0]!]) * p.fraction;
+    expect(travelled).toBeCloseTo(1, 6);
+  });
+});
+
+describe('random screensaver', () => {
+  it('resolves random once through the picker, and leaves a chosen drawing alone', () => {
+    expect(resolveScreensaver('random', () => 'koch')).toBe('koch');
+    expect(resolveScreensaver('tree', () => 'koch')).toBe('tree');
+  });
+  it('can reach every drawing, and only drawings', () => {
+    const all = Object.keys(DRAWING_STYLE);
+    const seen = new Set(all.map((_, i) => randomScreensaver(() => (i + 0.5) / all.length)));
+    expect([...seen].sort()).toEqual([...all].sort());
+    expect(randomScreensaver(() => 0.999999)).toBeDefined();
   });
 });
 

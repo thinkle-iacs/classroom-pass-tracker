@@ -21,9 +21,13 @@ export const SCREENSAVERS = {
   stitching: 'Curve stitching (lines between axes)',
   koch: 'Koch snowflake',
   tree: 'Fractal tree',
+  bounce: 'Bouncing triangle (new colour at every edge)',
 } as const;
 export type Screensaver = keyof typeof SCREENSAVERS;
-const screensaverIds = Object.keys(SCREENSAVERS) as [Screensaver, ...Screensaver[]];
+/** What the teacher can choose: a drawing, or 'random' for a different one each time the display loads. */
+export const SCREENSAVER_CHOICES = { random: 'Random (a different one each time the display loads)', ...SCREENSAVERS } as const;
+export type ScreensaverChoice = keyof typeof SCREENSAVER_CHOICES;
+const screensaverIds = Object.keys(SCREENSAVER_CHOICES) as [ScreensaverChoice, ...ScreensaverChoice[]];
 
 export const settingsSchema = z.object({
   warningAfterMinutes: z.number().min(1).max(60),

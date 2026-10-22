@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Button, Container, Form, FormItem, Input, Option, Select, Text } from 'contain-css-svelte';
-  import { DEFAULT_SETTINGS, SCREENSAVERS, settingsSchema, type Settings } from '@pass/shared';
+  import DrawingPreview from './DrawingPreview.svelte';
+  import { DEFAULT_SETTINGS, SCREENSAVER_CHOICES, settingsSchema, type Settings } from '@pass/shared';
 
   let { settings, busy, onSave }: { settings: Settings; busy: boolean; onSave: (s: Settings) => void } = $props();
 
@@ -31,9 +32,14 @@
     <FormItem>
       {#snippet label()}Classroom display screensaver{/snippet}
       <Select bind:value={form.screensaver}>
-        {#each Object.entries(SCREENSAVERS) as [id, name] (id)}<Option value={id}>{name}</Option>{/each}
+        {#each Object.entries(SCREENSAVER_CHOICES) as [id, name] (id)}<Option value={id}>{name}</Option>{/each}
       </Select>
     </FormItem>
+    {#if form.screensaver === 'random'}
+      <p><Text>The display picks a different drawing each time it loads. Choose a drawing above to preview it.</Text></p>
+    {:else}
+      <DrawingPreview pattern={form.screensaver} />
+    {/if}
     {#if !parsed.success}<p><Text danger>{parsed.error.issues[0]?.message}</Text></p>{/if}
     <Button primary type="submit" disabled={busy || !parsed.success}>Save settings</Button>
   </Form>
