@@ -153,7 +153,7 @@ export const BOUNCE_ASPECT = 16 / 9;
  * fixed seed keeps it the same on every reload, and the legs are returned in
  * unit-square coordinates like every other drawing.
  */
-export function bouncingTriangle(legs = 400, seed = 20261022): Generations {
+export function bouncingTriangle(legs = 600, seed = 20261022): Generations {
   let state = seed;
   const random = () => { // mulberry32
     state = (state + 0x6d2b79f5) | 0;
@@ -200,9 +200,10 @@ export const isSolid = (p: Screensaver): p is Exclude<Screensaver, Flat> => p in
 /**
  * A pen that travels at a constant speed (screen heights per second) instead of
  * following the elaboration schedule, drawing a triangle in its direction of
- * travel and keeping only the last `trail` legs, fading with age.
+ * travel, drawing a triangle in its direction of travel. Every leg stays, so
+ * the picture fills in over the block.
  */
-export interface Steady { speed: number; trail: number }
+export interface Steady { speed: number }
 export interface DrawingStyle { aspect: number; line: number; pivot: Point; spinMs?: number; rockDeg?: number; tiltDeg?: number; wobbleDeg?: number; steady?: Steady }
 export const DRAWING_STYLE: Record<Screensaver, DrawingStyle> = {
   sierpinski: { aspect: 1, line: 1.5, pivot: [0.5, 0.5], spinMs: 4 * 60_000, tiltDeg: 16, wobbleDeg: 10 },
@@ -211,8 +212,8 @@ export const DRAWING_STYLE: Record<Screensaver, DrawingStyle> = {
   koch: { aspect: 1, line: 1, pivot: [0.5, 0.5], spinMs: 6 * 60_000 },
   stitching: { aspect: 1, line: 1, pivot: [0.5, 0.5], spinMs: 5 * 60_000 },
   tree: { aspect: 1, line: 1, pivot: [0.5, 0.98], rockDeg: 3 }, // sways from the base
-  // Slow enough to follow across a room (~12 s edge to edge); the last dozen legs linger.
-  bounce: { aspect: BOUNCE_ASPECT, line: 1.3, pivot: [0.5, 0.5], steady: { speed: 0.09, trail: 12 } },
+  // Slow enough to follow across a room (~12 s edge to edge); the trail never fades, so it fills in.
+  bounce: { aspect: BOUNCE_ASPECT, line: 1.3, pivot: [0.5, 0.5], steady: { speed: 0.09 } },
 };
 
 const ROCK_MS = 90_000;

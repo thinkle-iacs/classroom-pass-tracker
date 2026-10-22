@@ -80,13 +80,13 @@
       ctx.rotate(angle);
       ctx.translate(-px, -py);
       const at = (p: Point) => [ox + p[0] * sx, oy + p[1] * sy] as const;
-      for (let g = style.steady ? Math.max(0, generation - style.steady.trail) : 0; g <= generation; g++) {
+      for (let g = 0; g <= generation; g++) {
         const segs = g < generation ? flat![g]! : traced(flat![g]!, fraction);
         if (style.steady) {
-          // Constant weight; older legs fade out, and the pen is a triangle pointing the way it's heading.
+          // Constant weight; every leg stays, and the pen is a triangle pointing the way it's heading.
           ctx.lineWidth = 3 * style.line * dpr;
           ctx.strokeStyle = colorOf(g);
-          ctx.globalAlpha = 0.9 * (1 - (generation - g) / (style.steady.trail + 1));
+          ctx.globalAlpha = g === generation ? 0.95 : 0.8;
           ctx.beginPath();
           for (const [a, b] of segs) { ctx.moveTo(...at(a)); ctx.lineTo(...at(b)); }
           ctx.stroke();
